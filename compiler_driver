@@ -1,0 +1,48 @@
+#!/usr/bin/python3
+import subprocess
+import sys
+import compiler
+
+def preprocess(file):
+    output_file = file[:-2] + ".i"
+    output = subprocess.run(["gcc","-E","-P",file,"-o",output_file], stdout=subprocess.PIPE).stdout.decode()
+    if output:
+        print(output)
+    return output_file
+
+def compile_stub(file):
+    output_file = file[:-2] + ".s"
+    output = subprocess.run(["gcc","-S","-O","-fno-asynchronous-unwind-tables","-fcf-protection=none",file], stdout=subprocess.PIPE).stdout.decode()
+    if output:
+        print(output)
+    subprocess.run(["rm",file], stdout=subprocess.PIPE)
+    return output_file
+
+def assemble(file):
+    output_file = file[:-2]
+    output = subprocess.run(["gcc",file,"-o",output_file], stdout=subprocess.PIPE).stdout.decode()
+    if output:
+        print(output)
+    subprocess.run(["rm",file], stdout=subprocess.PIPE)
+    return output_file
+
+
+def main():
+    input_files = []
+    for arg in sys.argv[1:]:
+        if arg[0:2] == "--":
+            stage = arg[2:]
+        else:
+            input_files.append(arg)
+
+    try:
+        for file in input_files:
+            preprocessed = preprocess(file)
+            compiled = compiler.compile_c(preprocessed,stage)
+    except RuntimeError as err:
+        print(f"Error {err}")
+        sys.exit(1)
+
+    #assemble(compiled)
+
+main()
