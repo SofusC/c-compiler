@@ -2,26 +2,27 @@ import lexer
 import parser
 
 def compile_c(file, flag):
-    if flag == "lex":
-        tokens = lexer.lex(file)
-    elif flag == "parse":
-        tokens = lexer.lex(file)
-        [print(token) for token in tokens]
+    output = None
+    tokens = lexer.lex(file)
+    if flag in ["parse", "codegen", "all"]:
         ast = parser.parse(tokens)
-        print(ast)
-    elif flag == "codegen":
-        tokens = lexer.lex(file)
-        ast = parser.parse(tokens)
-        print(ast)
+
+    if flag in ["codegen", "all"]:
         asm = ast.generate()
-        asm.pretty()
-    else:
-        tokens = lexer.lex(file)
-        ast = parser.parse(tokens)
-        print(ast)
-        asm = ast.generate()
-        asm.pretty()
+
+    if flag in ["all"]:
         output = file[:-2] + ".s"
         with open(output, "w") as f:
             asm.generate(f)
-        return output
+
+    if flag == "lex":
+        [print(token) for token in tokens]
+    elif flag == "parse":
+        print(ast)
+    elif flag == "codegen":
+        asm.pretty()
+    else:
+        print(ast)
+        asm.pretty()
+
+    return output
