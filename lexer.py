@@ -14,6 +14,10 @@ TOKENS = [
         ("CLOSE_BRACE", r"}"),
         ("SEMICOLON",   r";"),
 
+        ("TILDE",       r"~"),
+        ("NEGATION",    r"-"),
+        ("DECREMENT",   r"--"),
+
         ("MISMATCH",    r"\S+"),
         ]
 
@@ -30,6 +34,11 @@ class TokenType(Enum):
     OPEN_BRACE = auto()
     CLOSE_BRACE = auto()
     SEMICOLON = auto()
+
+    TILDE = auto()
+    NEGATION = auto()
+    DECREMENT = auto()
+
     MISMATCH = auto()
 
 @dataclass
