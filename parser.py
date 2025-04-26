@@ -1,5 +1,6 @@
 import assembly_ast as asm_ast
 from abc import ABC, abstractmethod
+from lexer import TokenType
 
 class AST(ABC):
     @abstractmethod
@@ -65,29 +66,29 @@ def parse(tokens):
     return ast
 
 def parse_function(tokens):
-    expect("INT", tokens)
-    identifier = expect("IDENTIFIER",tokens)
-    expect("OPEN_PAREN", tokens)
-    expect("VOID", tokens)
-    expect("CLOSE_PAREN", tokens)
-    expect("OPEN_BRACE", tokens)
+    expect(TokenType.INT, tokens)
+    identifier = expect(TokenType.IDENTIFIER,tokens)
+    expect(TokenType.OPEN_PAREN, tokens)
+    expect(TokenType.VOID, tokens)
+    expect(TokenType.CLOSE_PAREN, tokens)
+    expect(TokenType.OPEN_BRACE, tokens)
     statement = parse_statement(tokens)
-    expect("CLOSE_BRACE", tokens)
+    expect(TokenType.CLOSE_BRACE, tokens)
     return FunctionNode(identifier, statement)
 
 def parse_statement(tokens):
-    expect("RETURN", tokens)
+    expect(TokenType.RETURN, tokens)
     exp = parse_exp(tokens)
-    expect("SEMICOLON", tokens)
+    expect(TokenType.SEMICOLON, tokens)
     return StatementNode(exp)
 
 def parse_exp(tokens):
-    constant = expect("CONSTANT", tokens)
+    constant = expect(TokenType.CONSTANT, tokens)
     return IntNode(constant)
 
 
 def expect(expected, tokens):
     actual = tokens.pop(0)
-    if actual.kind != expected:
-        raise RuntimeError(f"Expected '{expected}' but found '{actual.kind}'")
+    if actual.token_type != expected:
+        raise RuntimeError(f"Expected '{expected}' but found '{actual.token_type}'")
     return actual
