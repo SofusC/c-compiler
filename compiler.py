@@ -1,7 +1,5 @@
 import lexer
 import parser
-import asm_generator
-import os
 
 def compile_c(file, flag):
     if flag == "lex":
