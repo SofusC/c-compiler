@@ -29,6 +29,7 @@ def assemble(file):
 
 def main():
     input_files = []
+    stage = None
     for arg in sys.argv[1:]:
         if arg[0:2] == "--":
             stage = arg[2:]
@@ -39,10 +40,11 @@ def main():
         for file in input_files:
             preprocessed = preprocess(file)
             compiled = compiler.compile_c(preprocessed,stage)
+            subprocess.run(["rm",preprocessed], stdout=subprocess.PIPE)
+            assemble(compiled)
     except RuntimeError as err:
         print(f"Error {err}")
         sys.exit(1)
 
-    #assemble(compiled)
 
 main()

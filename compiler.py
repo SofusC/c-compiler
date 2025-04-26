@@ -1,18 +1,29 @@
 import lexer
 import parser
 import asm_generator
+import os
 
 def compile_c(file, flag):
     if flag == "lex":
         tokens = lexer.lex(file)
-    if flag == "parse":
+    elif flag == "parse":
         tokens = lexer.lex(file)
         [print(token) for token in tokens]
         ast = parser.parse(tokens)
         print(ast)
-    if flag == "codegen":
+    elif flag == "codegen":
         tokens = lexer.lex(file)
         ast = parser.parse(tokens)
         print(ast)
         asm = ast.generate()
         asm.pretty()
+    else:
+        tokens = lexer.lex(file)
+        ast = parser.parse(tokens)
+        print(ast)
+        asm = ast.generate()
+        asm.pretty()
+        output = file[:-2] + ".s"
+        with open(output, "w") as f:
+            asm.generate(f)
+        return output
