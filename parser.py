@@ -2,12 +2,12 @@ import assembly_ast as asm_ast
 from abc import ABC, abstractmethod
 from lexer import TokenType
 
-class AST(ABC):
+class ASTNode(ABC):
     @abstractmethod
     def generate(self):
         pass
 
-class ProgramNode(AST):
+class Program(ASTNode):
     def __init__(self,_function):
         self.function = _function
 
@@ -20,23 +20,23 @@ Program(
     {self.function}
 )"""
 
-class FunctionNode(AST):
-    def __init__(self,_identifier,_statement):
-        self.identifier = _identifier
-        self.statement = _statement
+class Function(ASTNode):
+    def __init__(self,_name,_body):
+        self.name = _name
+        self.body = _body
 
     def generate(self):
-        return asm_ast.asm_function(self.identifier.value, self.statement.generate())
+        return asm_ast.asm_function(self.name.value, self.body.generate())
 
     def __str__(self):
         return f"""\
 Function(
-    name='{self.identifier.value}',
-    body={self.statement}
-)"""
+        name='{self.name.value}',
+        body={self.body}
+    )"""
     
 
-class StatementNode(AST):
+class Statement(ASTNode):
     def __init__(self,_exp):
         self.exp = _exp
 
@@ -46,10 +46,10 @@ class StatementNode(AST):
     def __str__(self):
         return f"""\
 Return(
-    {self.exp}
-    )"""
+        {self.exp}
+             )"""
 
-class IntNode(AST):
+class Exp(ASTNode):
     def __init__(self,_constant):
         self.constant = _constant
 
@@ -60,7 +60,7 @@ class IntNode(AST):
         return f"\tConstant({self.constant.value})"
 
 def parse(tokens):
-    ast = ProgramNode(parse_function(tokens))
+    ast = Program(parse_function(tokens))
     if len(tokens) != 0:
         raise RuntimeError(f"Syntax error, tokens left: {[token for token in tokens]}")
     return ast
@@ -74,17 +74,17 @@ def parse_function(tokens):
     expect(TokenType.OPEN_BRACE, tokens)
     statement = parse_statement(tokens)
     expect(TokenType.CLOSE_BRACE, tokens)
-    return FunctionNode(identifier, statement)
+    return Function(identifier, statement)
 
 def parse_statement(tokens):
     expect(TokenType.RETURN, tokens)
     exp = parse_exp(tokens)
     expect(TokenType.SEMICOLON, tokens)
-    return StatementNode(exp)
+    return Statement(exp)
 
 def parse_exp(tokens):
     constant = expect(TokenType.CONSTANT, tokens)
-    return IntNode(constant)
+    return Exp(constant)
 
 
 def expect(expected, tokens):
