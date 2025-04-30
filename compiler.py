@@ -5,7 +5,7 @@ def compile_c(file, flag):
     output = None
     tokens = lexer.lex(file)
     if flag in ["parse", "codegen", "all"]:
-        ast = parser.parse(tokens)
+        ast = parser.Program(tokens)
 
     if flag in ["codegen", "all"]:
         asm = ast.generate()
