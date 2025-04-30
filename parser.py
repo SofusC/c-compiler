@@ -6,6 +6,20 @@ class ASTNode(ABC):
     @abstractmethod
     def generate(self):
         pass
+    
+    def __str__(self, level = 0):
+        def indent(text, level):
+            prefix = "   "
+            return "\n".join(prefix * level + line for line in text.splitlines())
+        
+        class_name = self.__class__.__name__
+        fields = self.__dict__.items()
+        field_strings = []
+        for _, value in fields:
+            field_strings.append(f"{value}")
+        body = "\n".join(field_strings)
+        return f"{indent(class_name + '(', level)}\n{indent(body, level + 1)}\n{indent(')', level)}"
+
 
 class Program(ASTNode):
     def __init__(self, _function):
@@ -14,11 +28,7 @@ class Program(ASTNode):
     def generate(self):
         return asm_ast.asm_program(self.function.generate())
 
-    def __str__(self):
-        return f"""\
-Program(
-    {self.function}
-)"""
+
 
 class FunctionDefinition(ASTNode):
     def __init__(self, _name, _body):
@@ -28,12 +38,6 @@ class FunctionDefinition(ASTNode):
     def generate(self):
         return asm_ast.asm_function(self.name.value, self.body.generate())
 
-    def __str__(self):
-        return f"""\
-Function(
-        name='{self.name.value}',
-        body={self.body}
-    )"""
     
 
 class Statement(ASTNode):
@@ -46,11 +50,6 @@ class Return(Statement):
     def generate(self):
         return [asm_ast.asm_mov(self.exp.generate(), asm_ast.asm_register()), asm_ast.asm_ret()]
 
-    def __str__(self):
-        return f"""\
-Return(
-        {self.exp}
-             )"""
 
 
 class Exp(ASTNode):
@@ -62,9 +61,10 @@ class Constant(Exp):
 
     def generate(self):
         return asm_ast.asm_imm(self.constant)
+    
+    def __str__(self, level = 0):
+        return f"Constant({self.constant})"
 
-    def __str__(self):
-        return f"\tConstant({self.constant})"
     
 class Unary(Exp):
     def __init__(self, _unary_operator, _exp):
@@ -74,22 +74,25 @@ class Unary(Exp):
     def generate(self):
         pass
     
-    def __str__(self):
-        return f"""\
-Unary(
-        {self.unary_operator}
-        {self.exp}
-             )"""
 
 class UnaryOperator(ASTNode):
     pass
 
 class Complement(UnaryOperator):
-    pass
+    def generate(self):
+        pass
+
+    def __str__(self, level = 0):
+        return "Complement"
+
 
 class Negate(UnaryOperator):
-    pass
+    def generate(self):
+        pass
 
+    def __str__(self, level = 0):
+        return "Negate"
+    
 
 class Parser:
     def __init__(self, _tokens):
@@ -113,9 +116,9 @@ class Parser:
             case TokenType.CONSTANT:
                 return Constant(token.value)
             case TokenType.TILDE:
-                return Unary(Complement, self.parse_exp())
+                return Unary(Complement(), self.parse_exp())
             case TokenType.NEGATION:
-                return Unary(Negate, self.parse_exp())
+                return Unary(Negate(), self.parse_exp())
             case TokenType.OPEN_PAREN:
                 exp = self.parse_exp()
                 self.expect(TokenType.CLOSE_PAREN)
@@ -130,7 +133,7 @@ class Parser:
     
     def parse_function_definition(self):
         self.expect(TokenType.INT)
-        name = self.expect(TokenType.IDENTIFIER)
+        name = self.expect(TokenType.IDENTIFIER).value
         self.expect(TokenType.OPEN_PAREN)
         self.expect(TokenType.VOID)
         self.expect(TokenType.CLOSE_PAREN)
