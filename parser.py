@@ -36,7 +36,7 @@ class FunctionDefinition(ASTNode):
         self.body = _body
 
     def generate(self):
-        return asm_ast.asm_function(self.name.value, self.body.generate())
+        return asm_ast.asm_function(self.name, self.body.generate())
 
     
 
