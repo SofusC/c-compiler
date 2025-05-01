@@ -97,21 +97,17 @@ class Negate(UnaryOperator):
 class Parser:
     def __init__(self, _tokens):
         self.tokens = _tokens
-
-    def expect_list(self, expected):
+        
+    def expect(self, expected):
+        if not isinstance(expected, list):
+            expected = [expected]
         actual = self.tokens.pop(0)
         if actual.token_type not in expected:
             raise RuntimeError(f"Expected '{expected}' but found '{actual.token_type}'")
         return actual
 
-    def expect(self, expected):
-        actual = self.tokens.pop(0)
-        if actual.token_type != expected:
-            raise RuntimeError(f"Expected '{expected}' but found '{actual.token_type}'")
-        return actual
-
     def parse_exp(self):
-        token = self.expect_list([TokenType.CONSTANT, TokenType.TILDE, TokenType.NEGATION, TokenType.OPEN_PAREN])
+        token = self.expect([TokenType.CONSTANT, TokenType.TILDE, TokenType.NEGATION, TokenType.OPEN_PAREN])
         match token.token_type:
             case TokenType.CONSTANT:
                 return Constant(token.value)
