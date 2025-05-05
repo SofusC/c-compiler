@@ -26,11 +26,8 @@ class Program(ASTNode):
     def __init__(self, _function):
         self.function = _function
 
-    def emit(self):
-        return emitter.IRProgram(self.function.emit())
-
     def generate(self):
-        return asm_ast.asm_program(self.function.generate())
+        return asm_ast.AsmProgram(self.function.generate())
 
 
 
@@ -39,12 +36,8 @@ class FunctionDefinition(ASTNode):
         self.name = _name
         self.body = _body
 
-    def emit(self, instructions):
-        self.body.emit(instructions)
-        return emitter.IRFunctionDefinition(self.name, instructions)
-
     def generate(self):
-        return asm_ast.asm_function(self.name, self.body.generate())
+        return asm_ast.AsmFunction(self.name, self.body.generate())
 
     
 
@@ -55,13 +48,8 @@ class Return(Statement):
     def __init__(self, _exp):
         self.exp = _exp
 
-    def emit(self, instructions):
-        self.exp.emit(instructions)
-        instructions.append(emitter.IRReturn(instructions[-1].dst))
-        return
-
     def generate(self):
-        return [asm_ast.asm_mov(self.exp.generate(), asm_ast.asm_register()), asm_ast.asm_ret()]
+        return [asm_ast.AsmMov(self.exp.generate(), asm_ast.asm_register()), asm_ast.AsmRet()]
 
 
 
@@ -72,11 +60,8 @@ class Constant(Exp):
     def __init__(self, _constant):
         self.constant = _constant
 
-    def emit(self, instructions):
-        return emitter.IRConstant(self.constant)
-
     def generate(self):
-        return asm_ast.asm_imm(self.constant)
+        return asm_ast.AsmImm(self.constant)
     
     def __str__(self, level = 0):
         return f"Constant({self.constant})"
@@ -87,14 +72,6 @@ class Unary(Exp):
         self.unary_operator = _unary_operator
         self.exp = _exp
 
-    def emit(self, instructions):
-        src = self.exp.emit(instructions)
-        dst_name = "change_me.0"
-        dst = emitter.IRVar(dst_name)
-        tacky_op = self.unary_operator.emit()
-        instructions.append(emitter.IRUnary(tacky_op,src,dst))
-        return dst
-
     def generate(self):
         pass
     
@@ -103,9 +80,6 @@ class UnaryOperator(ASTNode):
     pass
 
 class Complement(UnaryOperator):
-    def emit(self):
-        return emitter.IRComplement()
-
     def generate(self):
         pass
 
@@ -114,9 +88,6 @@ class Complement(UnaryOperator):
 
 
 class Negate(UnaryOperator):
-    def emit(self):
-        return emitter.IRNegate()
-
     def generate(self):
         pass
 

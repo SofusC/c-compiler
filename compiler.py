@@ -1,6 +1,7 @@
 import lexer
 import parser
 import emitter
+import assembly_ast
 
 def compile_c(file, flag):
     output = None
@@ -12,12 +13,13 @@ def compile_c(file, flag):
         emitted_ir = emitter.IREmitter().emit_program(ast)
 
     if flag in ["codegen", "all"]:
-        asm = ast.generate()
+        asm = assembly_ast.AsmGenerator().generate_asm_ast(emitted_ir)
 
     if flag in ["all"]:
         output = file[:-2] + ".s"
         with open(output, "w") as f:
-            asm.generate(f)
+            assembly_code = assembly_ast.AsmGenerator().generate_asm_code(asm)
+            f.write(assembly_code)
 
     if flag == "lex":
         [print(token) for token in tokens]
@@ -26,9 +28,9 @@ def compile_c(file, flag):
     elif flag == "tacky":
         print(emitted_ir)
     elif flag == "codegen":
-        asm.pretty()
+        print(asm)
     else:
         print(ast)
-        asm.pretty()
+        print(asm)
 
     return output
