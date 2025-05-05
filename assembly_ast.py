@@ -1,4 +1,5 @@
 import emitter
+from enum import Enum, auto
 
 class AsmProgram():
     def __init__(self, _function_definition):
@@ -20,6 +21,8 @@ class AsmFunction():
             res += ins.__str__(indent+2) + "\n"
         res += " " * indent + ")"
         return res
+
+
 
 class AsmMov():
     def __init__(self, _src, _dst):
@@ -49,14 +52,12 @@ class AsmRet():
         return " " * indent + f"Ret"
 
 
-class AsmNot():
-    def __str__(self):
-        return f"Not"
-    
-class AsmNeg():
-    def __str__(self):
-        return f"Neg"
-    
+
+class AsmUnaryOperator(Enum):
+    Neg = auto()
+    Not = auto()
+
+
 
 class AsmImm():
     def __init__(self, _int):
@@ -87,6 +88,13 @@ class AsmStack():
         return f"Stack({self.int})"
 
     
+    
+class AsmRegs(Enum):
+    AX = auto()
+    R10 = auto()
+
+
+
 class AsmAllocator():
     def __init__(self):
         self.identifiers = {}
@@ -99,7 +107,7 @@ class AsmAllocator():
             if isinstance(instruction, AsmMov):
                 src, dst = instruction.src, instruction.dst
                 if isinstance(src, AsmStack) and isinstance(dst, AsmStack):
-                    tmp = AsmReg("R10")
+                    tmp = AsmReg(AsmRegs.R10)
                     new_instructions += [AsmMov(src, tmp), AsmMov(tmp, dst)]
                     continue
             new_instructions.append(instruction)
@@ -140,15 +148,15 @@ def generate_asm_ast(ast_node):
             return AsmFunction(name, asm_instructions)
         case emitter.IRReturn(val = val):
             val = generate_asm_ast(val)
-            return [AsmMov(val, AsmReg("AX")), 
+            return [AsmMov(val, AsmReg(AsmRegs.AX)), 
                     AsmRet()]
         case emitter.IRUnary(unary_operator = u, src = src, dst = dst):
             return [AsmMov(generate_asm_ast(src), generate_asm_ast(dst)), 
                     AsmUnary(generate_asm_ast(u), generate_asm_ast(dst))]
         case emitter.IRComplement():
-            return AsmNot()
+            return AsmUnaryOperator.Not
         case emitter.IRNegate():
-            return AsmNeg()
+            return AsmUnaryOperator.Neg
         case emitter.IRConstant(int = constant):
             return AsmImm(constant)
         case emitter.IRVar(identifier = identifier):
@@ -187,14 +195,14 @@ def generate_asm_code(ast_node):
         case AsmAllocateStack(int = int):
             res =  f"   subq   ${int},  %rsp\n"
             return res
-        case AsmNeg():
+        case AsmUnaryOperator.Neg:
             return "negl"
-        case AsmNot():
+        case AsmUnaryOperator.Not:
             return "notl"
-        case AsmReg(reg = "AX"):
-            return "%eax"
-        case AsmReg(reg = "R10"):
-            return "%r10d"
+        case AsmReg(reg = AsmRegs.AX):
+            return f"%eax"
+        case AsmReg(reg = AsmRegs.R10):
+            return f"%r10d"
         case AsmStack(int = int):
             return f"{int}(%rbp)"
         case AsmImm(int = int):
