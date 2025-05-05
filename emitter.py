@@ -1,11 +1,7 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 import parser
 
 class TackyNode(ABC):
-    @abstractmethod
-    def generate(self):
-        pass
-    
     def __str__(self, level = 0):
         def indent(text, level):
             prefix = "   "
@@ -24,18 +20,11 @@ class IRProgram(TackyNode):
     def __init__(self, _function):
         self.function = _function
 
-    def generate(self):
-        return asm_ast.asm_program(self.function.generate())
-
-
 
 class IRFunctionDefinition(TackyNode):
     def __init__(self, _name, _body):
         self.name = _name
         self.body = _body
-
-    def generate(self):
-        return asm_ast.asm_function(self.name, self.body.generate())
     
     def __str__(self, level=0):
         def indent(text, level):
@@ -53,9 +42,6 @@ class IRReturn(IRInstruction):
     def __init__(self, _val):
         self.val = _val
 
-    def generate(self):
-        return [asm_ast.asm_mov(self.exp.generate(), asm_ast.asm_register()), asm_ast.asm_ret()]
-    
     def __str__(self, level=0):
         return f"IRReturn({self.val})"
     
@@ -64,9 +50,6 @@ class IRUnary(IRInstruction):
         self.unary_operator = _unary_operator
         self.src = _src
         self.dst = _dst
-
-    def generate(self):
-        pass
 
     def __str__(self):
         return f"Unary({self.unary_operator}, {self.src}, {self.dst})"
@@ -79,9 +62,6 @@ class IRConstant(IRVal):
     def __init__(self, _int):
         self.int = _int
 
-    def generate(self):
-        return asm_ast.asm_imm(self.constant)
-    
     def __str__(self, level = 0):
         return f"Constant({self.int})"
     
@@ -89,9 +69,6 @@ class IRVar(IRVal):
     def __init__(self, _identifier):
         self.identifier = _identifier
 
-    def generate(self):
-        return asm_ast.asm_imm(self.constant)
-    
     def __str__(self, level = 0):
         return f"Var('{self.identifier}')"
     
@@ -100,17 +77,11 @@ class IRUnaryOperator(TackyNode):
     pass
 
 class IRComplement(IRUnaryOperator):
-    def generate(self):
-        pass
-
     def __str__(self, level = 0):
         return "Complement"
 
 
 class IRNegate(IRUnaryOperator):
-    def generate(self):
-        pass
-
     def __str__(self, level = 0):
         return "Negate"
     

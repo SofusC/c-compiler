@@ -4,10 +4,6 @@ class AsmProgram():
     def __init__(self, _function_definition):
         self.function_definition = _function_definition
 
-    def generate(self,file):
-        self.function_definition.generate(file)
-        file.write('   .section .note.GNU-stack,"",@progbits\n')
-
     def __str__(self, indent = 0):
         return " " * indent + "Program(" + "\n" + self.function_definition.__str__(indent + 1) + "\n" + " " * indent + ")"
 
@@ -15,12 +11,6 @@ class AsmFunction():
     def __init__(self, _name, _instructions):
         self.name = _name
         self.instructions = _instructions
-
-    def generate(self, file):
-        file.write(f"   .globl {self.name}\n")
-        file.write(f"{self.name}:\n")
-        for ins in self.instructions:
-            ins.generate(file)
 
     def __str__(self, indent = 0):
         res = " " * indent + "Function(" + "\n"
@@ -35,13 +25,6 @@ class AsmMov():
     def __init__(self, _src, _dst):
         self.src = _src
         self.dst = _dst
-
-    def generate(self, file):
-        file.write(f"   movl   ")
-        self.src.generate(file)
-        file.write(f",")
-        self.dst.generate(file)
-        file.write(f"\n")
 
     def __str__(self, indent = 0):
         return " " * indent + f"Mov({self.src}, {self.dst})"
@@ -62,9 +45,6 @@ class AsmAllocateStack():
         return " " * indent + f"AllocateStack({self.int})"
 
 class AsmRet():
-    def generate(self, file):
-        file.write(f"   ret\n")
-
     def __str__(self, indent = 0):
         return " " * indent + f"Ret"
 
@@ -81,9 +61,6 @@ class AsmNeg():
 class AsmImm():
     def __init__(self, _int):
         self.int = _int
-
-    def generate(self, file):
-        file.write(f"${self.int}")
 
     def __str__(self):
         return f"Imm({self.int})"
@@ -110,9 +87,11 @@ class AsmStack():
         return f"Stack({self.int})"
 
     
-class AsmGenerator():
-    identifiers = {}
-    stack_counter = 0
+class AsmAllocator():
+    def __init__(self):
+        self.identifiers = {}
+        self.stack_counter = 0
+
     def fix_invalid_mov_instructions(self, program):
         function = program.function_definition
         new_instructions = []
@@ -149,80 +128,76 @@ class AsmGenerator():
                     self.replace_pseudo_registers(instruction)
             case _:
                 return ast_node
-                
-    def generate_asm_ast(self, ast_node):
-        match ast_node:
-            case emitter.IRProgram(function = f):
-                program = AsmProgram(self.generate_asm_ast(f))
-                self.replace_pseudo_registers(program)
-                self.insert_stack_allocation(program)
-                self.fix_invalid_mov_instructions(program)
-                return program
-            case emitter.IRFunctionDefinition(name = name, body = instructions):
-                asm_instructions = []
-                for instruction in instructions:
-                    asm_instructions += self.generate_asm_ast(instruction)
-                return AsmFunction(name, asm_instructions)
-            case emitter.IRReturn(val = val):
-                val = self.generate_asm_ast(val)
-                return [AsmMov(val, AsmReg("AX")), 
-                        AsmRet()]
-            case emitter.IRUnary(unary_operator = u, src = src, dst = dst):
-                return [AsmMov(self.generate_asm_ast(src), self.generate_asm_ast(dst)), 
-                        AsmUnary(self.generate_asm_ast(u), self.generate_asm_ast(dst))]
-            case emitter.IRComplement():
-                return AsmNot()
-            case emitter.IRNegate():
-                return AsmNeg()
-            case emitter.IRConstant(int = constant):
-                return AsmImm(constant)
-            case emitter.IRVar(identifier = identifier):
-                return AsmPseudo(identifier)
-            case _:
-                raise NotImplementedError(f"IR object {ast_node} is not implemented yet.")
             
-    def generate_asm_code(self, ast_node):
-        match ast_node:
-            case AsmProgram(function_definition = function_definition):
-                res = self.generate_asm_code(function_definition)
-                res += '   .section .note.GNU-stack,"",@progbits\n'
-                return res
-            case AsmFunction(name = name, instructions = instructions):
-                res =   f"   .globl {name}\n"
-                res +=  f"{name}:\n"
-                res +=  f"   pushq  %rbp\n"
-                res +=  f"   movq   %rsp, %rbp\n"
-                for instruction in instructions:
-                    res += self.generate_asm_code(instruction)
-                return res
-            case AsmMov(src = src, dst = dst):
-                src_operand = self.generate_asm_code(src)
-                dst_operand = self.generate_asm_code(dst)
-                return  f"   movl   {src_operand}, {dst_operand}\n"
-            case AsmRet():
-                res =   f"   movq   %rbp, %rsp\n"
-                res +=  f"   popq   %rbp\n"
-                res +=  f"   ret\n"
-                return res
-            case AsmUnary(unary_operator = unary_operator, operand = operand):
-                unary_instruction = self.generate_asm_code(unary_operator)
-                asm_operand = self.generate_asm_code(operand)
-                res =  f"   {unary_instruction}   {asm_operand}\n"
-                return res
-            case AsmAllocateStack(int = int):
-                res =  f"   subq   ${int},  %rsp\n"
-                return res
-            case AsmNeg():
-                return "negl"
-            case AsmNot():
-                return "notl"
-            case AsmReg(reg = "AX"):
-                return "%eax"
-            case AsmReg(reg = "R10"):
-                return "%r10d"
-            case AsmStack(int = int):
-                return f"{int}(%rbp)"
-            case AsmImm(int = int):
-                return f"${int}"
-            case _:
-                raise NotImplementedError(f"Cant generate assembly code for {ast_node}")
+def generate_asm_ast(ast_node):
+    match ast_node:
+        case emitter.IRProgram(function = f):
+            return AsmProgram(generate_asm_ast(f))
+        case emitter.IRFunctionDefinition(name = name, body = instructions):
+            asm_instructions = []
+            for instruction in instructions:
+                asm_instructions += generate_asm_ast(instruction)
+            return AsmFunction(name, asm_instructions)
+        case emitter.IRReturn(val = val):
+            val = generate_asm_ast(val)
+            return [AsmMov(val, AsmReg("AX")), 
+                    AsmRet()]
+        case emitter.IRUnary(unary_operator = u, src = src, dst = dst):
+            return [AsmMov(generate_asm_ast(src), generate_asm_ast(dst)), 
+                    AsmUnary(generate_asm_ast(u), generate_asm_ast(dst))]
+        case emitter.IRComplement():
+            return AsmNot()
+        case emitter.IRNegate():
+            return AsmNeg()
+        case emitter.IRConstant(int = constant):
+            return AsmImm(constant)
+        case emitter.IRVar(identifier = identifier):
+            return AsmPseudo(identifier)
+        case _:
+            raise NotImplementedError(f"IR object {ast_node} is not implemented yet.")
+        
+def generate_asm_code(ast_node):
+    match ast_node:
+        case AsmProgram(function_definition = function_definition):
+            res = generate_asm_code(function_definition)
+            res += '   .section .note.GNU-stack,"",@progbits\n'
+            return res
+        case AsmFunction(name = name, instructions = instructions):
+            res =   f"   .globl {name}\n"
+            res +=  f"{name}:\n"
+            res +=  f"   pushq  %rbp\n"
+            res +=  f"   movq   %rsp, %rbp\n"
+            for instruction in instructions:
+                res += generate_asm_code(instruction)
+            return res
+        case AsmMov(src = src, dst = dst):
+            src_operand = generate_asm_code(src)
+            dst_operand = generate_asm_code(dst)
+            return  f"   movl   {src_operand}, {dst_operand}\n"
+        case AsmRet():
+            res =   f"   movq   %rbp, %rsp\n"
+            res +=  f"   popq   %rbp\n"
+            res +=  f"   ret\n"
+            return res
+        case AsmUnary(unary_operator = unary_operator, operand = operand):
+            unary_instruction = generate_asm_code(unary_operator)
+            asm_operand = generate_asm_code(operand)
+            res =  f"   {unary_instruction}   {asm_operand}\n"
+            return res
+        case AsmAllocateStack(int = int):
+            res =  f"   subq   ${int},  %rsp\n"
+            return res
+        case AsmNeg():
+            return "negl"
+        case AsmNot():
+            return "notl"
+        case AsmReg(reg = "AX"):
+            return "%eax"
+        case AsmReg(reg = "R10"):
+            return "%r10d"
+        case AsmStack(int = int):
+            return f"{int}(%rbp)"
+        case AsmImm(int = int):
+            return f"${int}"
+        case _:
+            raise NotImplementedError(f"Cant generate assembly code for {ast_node}")

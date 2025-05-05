@@ -1,13 +1,7 @@
-import assembly_ast as asm_ast
-from abc import ABC, abstractmethod
+from abc import ABC
 from lexer import TokenType
-import emitter
 
 class ASTNode(ABC):
-    @abstractmethod
-    def generate(self):
-        pass
-    
     def __str__(self, level = 0):
         def indent(text, level):
             prefix = "   "
@@ -26,19 +20,12 @@ class Program(ASTNode):
     def __init__(self, _function):
         self.function = _function
 
-    def generate(self):
-        return asm_ast.AsmProgram(self.function.generate())
-
 
 
 class FunctionDefinition(ASTNode):
     def __init__(self, _name, _body):
         self.name = _name
         self.body = _body
-
-    def generate(self):
-        return asm_ast.AsmFunction(self.name, self.body.generate())
-
     
 
 class Statement(ASTNode):
@@ -48,9 +35,6 @@ class Return(Statement):
     def __init__(self, _exp):
         self.exp = _exp
 
-    def generate(self):
-        return [asm_ast.AsmMov(self.exp.generate(), asm_ast.asm_register()), asm_ast.AsmRet()]
-
 
 
 class Exp(ASTNode):
@@ -59,9 +43,6 @@ class Exp(ASTNode):
 class Constant(Exp):
     def __init__(self, _constant):
         self.constant = _constant
-
-    def generate(self):
-        return asm_ast.AsmImm(self.constant)
     
     def __str__(self, level = 0):
         return f"Constant({self.constant})"
@@ -72,25 +53,16 @@ class Unary(Exp):
         self.unary_operator = _unary_operator
         self.exp = _exp
 
-    def generate(self):
-        pass
-    
 
 class UnaryOperator(ASTNode):
     pass
 
 class Complement(UnaryOperator):
-    def generate(self):
-        pass
-
     def __str__(self, level = 0):
         return "Complement"
 
 
 class Negate(UnaryOperator):
-    def generate(self):
-        pass
-
     def __str__(self, level = 0):
         return "Negate"
     
