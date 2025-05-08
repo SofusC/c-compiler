@@ -94,20 +94,20 @@ class IREmitter:
 
     def emit_unary_operator(self, ast_node):
         match ast_node:
-            case parser.Complement():
+            case parser.UnaryOperator.Complement:
                 return IRComplement()
-            case parser.Negate():
+            case parser.UnaryOperator.Negate:
                 return IRNegate()
             
     def emit_exp(self, ast_node, instructions):
         match ast_node:
-            case parser.Constant(constant = c):
-                return IRConstant(c)
-            case parser.Unary(unary_operator = u, exp = e):
-                src = self.emit_exp(e, instructions)
+            case parser.Constant(constant):
+                return IRConstant(constant)
+            case parser.Unary(unary_operator, exp):
+                src = self.emit_exp(exp, instructions)
                 dst_name = self.make_temporary()
                 dst = IRVar(dst_name)
-                tacky_op = self.emit_unary_operator(u)
+                tacky_op = self.emit_unary_operator(unary_operator)
                 instructions.append(IRUnary(tacky_op,src,dst))
                 return dst
 

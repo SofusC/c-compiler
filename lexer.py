@@ -1,56 +1,43 @@
 import re
-from enum import Enum, auto
+from enum import Enum
 from dataclasses import dataclass
 
-TOKENS = [
-        ("RETURN",      r"return\b"),
-        ("VOID",        r"void\b"),
-        ("INT",         r"int\b"),
-        ("CONSTANT",    r"[0-9]+\b"),
-        ("IDENTIFIER",  r"[a-zA-Z_]\w*\b"),
-        ("OPEN_PAREN",  r"\("),
-        ("CLOSE_PAREN", r"\)"),
-        ("OPEN_BRACE",  r"{"),
-        ("CLOSE_BRACE", r"}"),
-        ("SEMICOLON",   r";"),
-
-        ("TILDE",       r"~"),
-        ("NEGATION",    r"-"),
-        ("DECREMENT",   r"--"),
-
-        ("MISMATCH",    r"\S+"),
-        ]
-
-PATTERN = re.compile("|".join(f"(?P<{name}>{pattern})" for name,pattern in TOKENS))
-
 class TokenType(Enum):
-    RETURN = auto()
-    VOID = auto()
-    INT = auto()
-    CONSTANT = auto()
-    IDENTIFIER = auto()
-    OPEN_PAREN = auto()
-    CLOSE_PAREN = auto()
-    OPEN_BRACE = auto()
-    CLOSE_BRACE = auto()
-    SEMICOLON = auto()
+    RETURN          = r"return\b"
+    VOID            = r"void\b"
+    INT             = r"int\b"
+    CONSTANT        = r"[0-9]+\b"
+    IDENTIFIER      = r"[a-zA-Z_]\w*\b"
+    OPEN_PAREN      = r"\("
+    CLOSE_PAREN     = r"\)"
+    OPEN_BRACE      = r"{"
+    CLOSE_BRACE     = r"}"
+    SEMICOLON       = r";"
 
-    TILDE = auto()
-    NEGATION = auto()
-    DECREMENT = auto()
+    TILDE           = r"~"
+    HYPHEN          = r"-"
+    DECREMENT       = r"--"
 
-    MISMATCH = auto()
+    PLUS            = r"\+"
+    ASTERISK        = r"\*"
+    FORWARD_SLASH   = r"/"
+    PERCENT_SIGN    = r"%"
+
+    MISMATCH        = r"\S+"
+
+
+PATTERN = re.compile("|".join(f"(?P<{tt.name}>{tt.value})" for tt in list(TokenType)))
 
 @dataclass
 class Token:
     token_type: TokenType
-    value: any = None
+    value: str | int | None = None
 
     def __str__(self):
         if self.value:
-            return f"Token of type {self.token_type} with value {self.value}"
+            return f"Token of type {self.token_type.name} with value {self.value}"
         else:
-            return f"Token of type {self.token_type}"
+            return f"Token of type {self.token_type.name}"
 
 
 def lex(file):
@@ -60,11 +47,11 @@ def lex(file):
         for mo in re.finditer(PATTERN, code):
             token = mo.lastgroup
             match token:
-                case "MISMATCH":
+                case TokenType.MISMATCH.name:
                     raise RuntimeError(f"Unexpected token {mo.group()}")
-                case "IDENTIFIER" | "CONSTANT":
+                case TokenType.IDENTIFIER.name | TokenType.CONSTANT.name:
                     value = mo.group()
-                    result.append(Token(TokenType[token],value))
+                    result.append(Token(TokenType[token], value))
                 case _:
                     result.append(Token(TokenType[token]))
     return result
