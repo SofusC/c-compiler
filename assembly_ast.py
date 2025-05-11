@@ -1,16 +1,19 @@
+from __future__ import annotations
 from enum import Enum, auto
+from dataclasses import dataclass
+from typing import List
 
+@dataclass
 class AsmProgram():
-    def __init__(self, _function_definition):
-        self.function_definition = _function_definition
+    function_definition: AsmFunction
 
     def __str__(self, indent = 0):
         return " " * indent + "Program(" + "\n" + self.function_definition.__str__(indent + 1) + "\n" + " " * indent + ")"
 
+@dataclass
 class AsmFunction():
-    def __init__(self, _name, _instructions):
-        self.name = _name
-        self.instructions = _instructions
+    name: str
+    instructions: List[AsmInstruction]
 
     def __str__(self, indent = 0):
         res = " " * indent + "Function(" + "\n"
@@ -22,31 +25,55 @@ class AsmFunction():
         return res
 
 
+class AsmInstruction():
+    pass
 
-class AsmMov():
-    def __init__(self, _src, _dst):
-        self.src = _src
-        self.dst = _dst
+@dataclass
+class AsmMov(AsmInstruction):
+    src: AsmOperand
+    dst: AsmOperand
 
     def __str__(self, indent = 0):
         return " " * indent + f"Mov({self.src}, {self.dst})"
 
-class AsmUnary():
-    def __init__(self, _unary_operator, _operand):
-        self.unary_operator = _unary_operator
-        self.operand = _operand
+@dataclass
+class AsmUnary(AsmInstruction):
+    unary_operator: AsmUnaryOperator
+    operand: AsmOperand
 
     def __str__(self, indent = 0):
         return " " * indent + f"Unary({self.unary_operator}, {self.operand})"
+
+@dataclass
+class AsmBinary(AsmInstruction):
+    binary_operator: AsmBinaryOperator
+    src: AsmOperand
+    dst: AsmOperand
+
+    def __str__(self, indent = 0):
+        return " " * indent + f"Binary({self.binary_operator}, {self.src}, {self.dst})"
     
-class AsmAllocateStack():
-    def __init__(self, _int):
-        self.int = _int
+@dataclass
+class AsmIdiv(AsmInstruction):
+    src: AsmOperand
+
+    def __str__(self, indent = 0):
+        return " " * indent + f"Idiv({self.src})"
+    
+class AsmCdq(AsmInstruction):
+    def __str__(self, indent = 0):
+        return " " * indent + f"Cdq"
+
+
+    
+@dataclass
+class AsmAllocateStack(AsmInstruction):
+    int: int
 
     def __str__(self, indent = 0):
         return " " * indent + f"AllocateStack({self.int})"
 
-class AsmRet():
+class AsmRet(AsmInstruction):
     def __str__(self, indent = 0):
         return " " * indent + f"Ret"
 
@@ -56,32 +83,40 @@ class AsmUnaryOperator(Enum):
     Neg = auto()
     Not = auto()
 
+class AsmBinaryOperator(Enum):
+    Add = auto()
+    Sub = auto()
+    Mult = auto()
 
 
-class AsmImm():
-    def __init__(self, _int):
-        self.int = _int
+
+class AsmOperand():
+    pass
+
+@dataclass
+class AsmImm(AsmOperand):
+    int: int
 
     def __str__(self):
         return f"Imm({self.int})"
     
-class AsmReg():
-    def __init__(self, _reg):
-        self.reg = _reg
-
+@dataclass
+class AsmReg(AsmOperand):
+    reg: AsmRegs
+    
     def __str__(self):
         return f"Reg({self.reg})"
     
-class AsmPseudo():
-    def __init__(self, _identifier):
-        self.identifier = _identifier
+@dataclass
+class AsmPseudo(AsmOperand):
+    identifier: str
 
     def __str__(self):
         return f"Pseudo({self.identifier})"
     
-class AsmStack():
-    def __init__(self, _int):
-        self.int = _int   
+@dataclass
+class AsmStack(AsmOperand):
+    int: int
 
     def __str__(self):
         return f"Stack({self.int})"
@@ -90,4 +125,6 @@ class AsmStack():
     
 class AsmRegs(Enum):
     AX = auto()
+    DX = auto()
     R10 = auto()
+    R11 = auto()
