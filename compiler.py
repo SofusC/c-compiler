@@ -13,16 +13,16 @@ def compile_c(file, flag):
         emitted_ir = emitter.IREmitter().emit_program(ast)
 
     if flag in ["codegen", "all"]:
-        asm = asm_generator.generate_asm_ast(emitted_ir)
+        asm = asm_generator.lower_to_asm(emitted_ir)
         allocator = asm_generator.AsmAllocator()
-        allocator.replace_pseudo_registers(asm)
-        allocator.insert_stack_allocation(asm)
-        allocator.fix_invalid_mov_instructions(asm)
+        allocator.lower_pseudo_regs(asm)
+        allocator.add_stack_frame(asm)
+        allocator.legalize_instr(asm)
 
     if flag in ["all"]:
         output = file[:-2] + ".s"
         with open(output, "w") as f:
-            assembly_code = asm_generator.generate_asm_code(asm)
+            assembly_code = asm_generator.emit_code(asm)
             f.write(assembly_code)
 
     if flag == "lex":

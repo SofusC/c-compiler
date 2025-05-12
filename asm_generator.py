@@ -5,25 +5,41 @@ class AsmAllocator():
     def __init__(self):
         self.identifiers = {}
         self.stack_counter = 0
-
-    def fix_invalid_mov_instructions(self, program):
+        
+    def legalize_instr(self, program):
+        def legalize(instruction):
+            match instruction:
+                case AsmMov(AsmStack() as src, AsmStack() as dst):
+                    tmp = AsmReg(AsmRegs.R10)
+                    return [AsmMov(src, tmp), AsmMov(tmp, dst)]
+                case AsmBinary(AsmBinaryOperator.Add | AsmBinaryOperator.Sub as binop, AsmStack() as src, AsmStack() as dst):
+                    tmp = AsmReg(AsmRegs.R10)
+                    return [AsmMov(src, tmp), 
+                            AsmBinary(binop, tmp, dst)]
+                case AsmBinary(AsmBinaryOperator.Mult, src, AsmStack() as dst):
+                    tmp = AsmReg(AsmRegs.R11)
+                    return [AsmMov(dst, tmp), 
+                            AsmBinary(AsmBinaryOperator.Mult, src, tmp),
+                            AsmMov(tmp, dst)]
+                case AsmIdiv(AsmImm() as operand):
+                    tmp = AsmReg(AsmRegs.R10)
+                    return [AsmMov(operand, tmp),
+                            AsmIdiv(tmp)]
+                case _:
+                    return [instruction]
+        
         function = program.function_definition
         new_instructions = []
         for instruction in function.instructions:
-            if isinstance(instruction, AsmMov):
-                src, dst = instruction.src, instruction.dst
-                if isinstance(src, AsmStack) and isinstance(dst, AsmStack):
-                    tmp = AsmReg(AsmRegs.R10)
-                    new_instructions += [AsmMov(src, tmp), AsmMov(tmp, dst)]
-                    continue
-            new_instructions.append(instruction)
+            new_instructions.extend(legalize(instruction))
         function.instructions = new_instructions
 
-    def insert_stack_allocation(self, program):
+    def add_stack_frame(self, program):
         function = program.function_definition
         function.instructions[:0] = [AsmAllocateStack(abs(self.stack_counter))]
 
-    def replace_pseudo_registers(self, ast_node):
+    # TODO Improve this functions structure
+    def lower_pseudo_regs(self, ast_node):
         match ast_node:
             case AsmPseudo(identifier = identifier):
                 if identifier not in self.identifiers:
@@ -31,49 +47,91 @@ class AsmAllocator():
                     self.identifiers[identifier] = self.stack_counter
                 return AsmStack(self.identifiers[identifier])
             case AsmMov(src = src, dst = dst):
-                ast_node.src = self.replace_pseudo_registers(src)
-                ast_node.dst = self.replace_pseudo_registers(dst)
+                ast_node.src = self.lower_pseudo_regs(src)
+                ast_node.dst = self.lower_pseudo_regs(dst)
             case AsmUnary(operand = operand):
-                ast_node.operand = self.replace_pseudo_registers(operand)
+                ast_node.operand = self.lower_pseudo_regs(operand)
+            case AsmBinary(_, src, dst):
+                ast_node.src = self.lower_pseudo_regs(src)
+                ast_node.dst = self.lower_pseudo_regs(dst)
+            case AsmIdiv(src):
+                ast_node.src = self.lower_pseudo_regs(src)
             case AsmProgram(function_definition = function_definition):
-                self.replace_pseudo_registers(function_definition)
+                self.lower_pseudo_regs(function_definition)
             case AsmFunction(name = name, instructions = instructions):
                 for instruction in instructions:
-                    self.replace_pseudo_registers(instruction)
+                    self.lower_pseudo_regs(instruction)
             case _:
                 return ast_node
             
-def generate_asm_ast(ast_node):
+def lower_to_asm(ast_node):
     match ast_node:
+        # TODO Remove all the redundant "function = f" pattern in this file
         case IRProgram(function = f):
-            return AsmProgram(generate_asm_ast(f))
+            return AsmProgram(lower_to_asm(f))
         case IRFunctionDefinition(name = name, body = instructions):
             asm_instructions = []
             for instruction in instructions:
-                asm_instructions += generate_asm_ast(instruction)
+                asm_instructions += lower_instr(instruction)
             return AsmFunction(name, asm_instructions)
+        
+def lower_instr(ast_node):
+    match ast_node:
         case IRReturn(val = val):
-            val = generate_asm_ast(val)
+            val = lower_operand(val)
             return [AsmMov(val, AsmReg(AsmRegs.AX)), 
                     AsmRet()]
         case IRUnary(unary_operator = u, src = src, dst = dst):
-            return [AsmMov(generate_asm_ast(src), generate_asm_ast(dst)), 
-                    AsmUnary(generate_asm_ast(u), generate_asm_ast(dst))]
+            return [AsmMov(lower_operand(src), lower_operand(dst)), 
+                    AsmUnary(lower_operator(u), lower_operand(dst))]
+        case IRBinary(IRBinaryOperator.DIVIDE, src1, src2, dst):
+            dividend_reg = AsmReg(AsmRegs.AX)
+            return [AsmMov(lower_operand(src1), dividend_reg),
+                    AsmCdq(),
+                    AsmIdiv(lower_operand(src2)),
+                    AsmMov(dividend_reg, lower_operand(dst))]
+        case IRBinary(IRBinaryOperator.REMAINDER, src1, src2, dst):
+            return [AsmMov(lower_operand(src1), AsmReg(AsmRegs.AX)),
+                    AsmCdq(),
+                    AsmIdiv(lower_operand(src2)),
+                    AsmMov(AsmReg(AsmRegs.DX), lower_operand(dst))]
+        case IRBinary(binary_operator, src1, src2, dst):
+            asm_binop = lower_operator(binary_operator)
+            asm_dst = lower_operand(dst)
+            return [AsmMov(lower_operand(src1), asm_dst),
+                    AsmBinary(asm_binop, lower_operand(src2), asm_dst)]
+        case _:
+            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
+
+def lower_operator(ast_node):
+    match ast_node:
+        # TODO Enums capitalized?
         case IRUnaryOperator.COMPLEMENT:
             return AsmUnaryOperator.Not
         case IRUnaryOperator.NEGATE:
             return AsmUnaryOperator.Neg
+        case IRBinaryOperator.ADD:
+            return AsmBinaryOperator.Add
+        case IRBinaryOperator.SUBTRACT:
+            return AsmBinaryOperator.Sub
+        case IRBinaryOperator.MULTIPLY:
+            return AsmBinaryOperator.Mult
+        case _:
+            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
+        
+def lower_operand(ast_node):
+    match ast_node:
         case IRConstant(int = constant):
             return AsmImm(constant)
         case IRVar(identifier = identifier):
             return AsmPseudo(identifier)
         case _:
-            raise NotImplementedError(f"IR object {ast_node} is not implemented yet.")
+            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
         
-def generate_asm_code(ast_node):
+def emit_code(ast_node):
     match ast_node:
         case AsmProgram(function_definition = function_definition):
-            res = generate_asm_code(function_definition)
+            res = emit_code(function_definition)
             res += '   .section .note.GNU-stack,"",@progbits\n'
             return res
         case AsmFunction(name = name, instructions = instructions):
@@ -82,11 +140,11 @@ def generate_asm_code(ast_node):
             res +=  f"   pushq  %rbp\n"
             res +=  f"   movq   %rsp, %rbp\n"
             for instruction in instructions:
-                res += generate_asm_code(instruction)
+                res += emit_code(instruction)
             return res
         case AsmMov(src = src, dst = dst):
-            src_operand = generate_asm_code(src)
-            dst_operand = generate_asm_code(dst)
+            src_operand = emit_code(src)
+            dst_operand = emit_code(dst)
             return  f"   movl   {src_operand}, {dst_operand}\n"
         case AsmRet():
             res =   f"   movq   %rbp, %rsp\n"
@@ -94,8 +152,8 @@ def generate_asm_code(ast_node):
             res +=  f"   ret\n"
             return res
         case AsmUnary(unary_operator = unary_operator, operand = operand):
-            unary_instruction = generate_asm_code(unary_operator)
-            asm_operand = generate_asm_code(operand)
+            unary_instruction = emit_code(unary_operator)
+            asm_operand = emit_code(operand)
             res =  f"   {unary_instruction}   {asm_operand}\n"
             return res
         case AsmAllocateStack(int = int):
