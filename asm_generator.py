@@ -153,8 +153,17 @@ def emit_code(ast_node):
         case AsmUnary(unary_operator = unary_operator, operand = operand):
             unary_instruction = emit_code(unary_operator)
             asm_operand = emit_code(operand)
-            res =  f"   {unary_instruction}   {asm_operand}\n"
+            res =   f"   {unary_instruction}   {asm_operand}\n"
             return res
+        case AsmBinary(binop, src, dst):
+            binop = emit_code(binop)
+            src, dst = emit_code(src), emit_code(dst)
+            return  f"   {binop}    {src}, {dst}\n"
+        case AsmIdiv(operand):
+            operand = emit_code(operand)
+            return  f"   idivl  {operand}\n"
+        case AsmCdq():
+            return  f"   cdq\n"
         case AsmAllocateStack(int = int):
             res =  f"   subq   ${int},  %rsp\n"
             return res
@@ -162,10 +171,20 @@ def emit_code(ast_node):
             return "negl"
         case AsmUnaryOperator.Not:
             return "notl"
+        case AsmBinaryOperator.Add:
+            return "addl"
+        case AsmBinaryOperator.Sub:
+            return "subl"
+        case AsmBinaryOperator.Mult:
+            return "imull"
         case AsmReg(reg = AsmRegs.AX):
             return f"%eax"
+        case AsmReg(AsmRegs.DX):
+            return f"%edx"
         case AsmReg(reg = AsmRegs.R10):
             return f"%r10d"
+        case AsmReg(reg = AsmRegs.R11):
+            return f"%r11d"
         case AsmStack(int = int):
             return f"{int}(%rbp)"
         case AsmImm(int = int):
