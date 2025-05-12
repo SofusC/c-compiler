@@ -11,22 +11,22 @@ class IREmitter:
     def emit_binary_operator(self, ast_node):
         match ast_node:
             case BinaryOperator.Add:
-                return IRBinaryOperator.ADD
+                return IRBinaryOperator.Add
             case BinaryOperator.Subtract:
-                return IRBinaryOperator.SUBTRACT
+                return IRBinaryOperator.Subtract
             case BinaryOperator.Multiply:
-                return IRBinaryOperator.MULTIPLY
+                return IRBinaryOperator.Multiply
             case BinaryOperator.Divide:
-                return IRBinaryOperator.DIVIDE
+                return IRBinaryOperator.Divide
             case BinaryOperator.Remainder:
-                return IRBinaryOperator.REMAINDER
+                return IRBinaryOperator.Remainder
 
     def emit_unary_operator(self, ast_node):
         match ast_node:
             case UnaryOperator.Complement:
-                return IRUnaryOperator.COMPLEMENT
+                return IRUnaryOperator.Complement
             case UnaryOperator.Negate:
-                return IRUnaryOperator.NEGATE
+                return IRUnaryOperator.Negate
             
     def emit_exp(self, ast_node, instructions):
         match ast_node:

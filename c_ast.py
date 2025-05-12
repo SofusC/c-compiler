@@ -3,6 +3,8 @@ from abc import ABC
 from enum import Enum, auto
 from dataclasses import dataclass
 
+# TODO Write common pretty printer for all ASTs
+
 class ASTNode(ABC):
     def __str__(self, level = 0):
         def indent(text, level):

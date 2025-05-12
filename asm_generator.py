@@ -84,13 +84,13 @@ def lower_instr(ast_node):
         case IRUnary(unop, src, dst):
             return [AsmMov(lower_operand(src), lower_operand(dst)), 
                     AsmUnary(lower_operator(unop), lower_operand(dst))]
-        case IRBinary(IRBinaryOperator.DIVIDE, src1, src2, dst):
+        case IRBinary(IRBinaryOperator.Divide, src1, src2, dst):
             dividend_reg = AsmReg(AsmRegs.AX)
             return [AsmMov(lower_operand(src1), dividend_reg),
                     AsmCdq(),
                     AsmIdiv(lower_operand(src2)),
                     AsmMov(dividend_reg, lower_operand(dst))]
-        case IRBinary(IRBinaryOperator.REMAINDER, src1, src2, dst):
+        case IRBinary(IRBinaryOperator.Remainder, src1, src2, dst):
             return [AsmMov(lower_operand(src1), AsmReg(AsmRegs.AX)),
                     AsmCdq(),
                     AsmIdiv(lower_operand(src2)),
@@ -105,16 +105,15 @@ def lower_instr(ast_node):
 
 def lower_operator(ast_node):
     match ast_node:
-        # TODO Enums capitalized?
-        case IRUnaryOperator.COMPLEMENT:
+        case IRUnaryOperator.Complement:
             return AsmUnaryOperator.Not
-        case IRUnaryOperator.NEGATE:
+        case IRUnaryOperator.Negate:
             return AsmUnaryOperator.Neg
-        case IRBinaryOperator.ADD:
+        case IRBinaryOperator.Add:
             return AsmBinaryOperator.Add
-        case IRBinaryOperator.SUBTRACT:
+        case IRBinaryOperator.Subtract:
             return AsmBinaryOperator.Sub
-        case IRBinaryOperator.MULTIPLY:
+        case IRBinaryOperator.Multiply:
             return AsmBinaryOperator.Mult
         case _:
             raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")

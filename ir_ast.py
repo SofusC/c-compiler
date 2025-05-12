@@ -80,18 +80,18 @@ class IRVar(IRVal):
 
 
 class IRUnaryOperator(Enum):
-    COMPLEMENT  = auto()
-    NEGATE      = auto()
+    Complement  = auto()
+    Negate      = auto()
 
     def __str__(self):
         return f"{self.name}"
     
 class IRBinaryOperator(Enum):
-    ADD         = auto()
-    SUBTRACT    = auto()
-    MULTIPLY    = auto()
-    DIVIDE      = auto()
-    REMAINDER   = auto()
+    Add         = auto()
+    Subtract    = auto()
+    Multiply    = auto()
+    Divide      = auto()
+    Remainder   = auto()
 
     def __str__(self):
         return f"{self.name}"
