@@ -38,38 +38,38 @@ class AsmAllocator():
         function = program.function_definition
         function.instructions[:0] = [AsmAllocateStack(abs(self.stack_counter))]
 
-    # TODO Improve this functions structure
-    def lower_pseudo_regs(self, ast_node):
-        match ast_node:
-            case AsmPseudo(identifier = identifier):
-                if identifier not in self.identifiers:
-                    self.stack_counter -= 4
-                    self.identifiers[identifier] = self.stack_counter
-                return AsmStack(self.identifiers[identifier])
-            case AsmMov(src = src, dst = dst):
-                ast_node.src = self.lower_pseudo_regs(src)
-                ast_node.dst = self.lower_pseudo_regs(dst)
-            case AsmUnary(operand = operand):
-                ast_node.operand = self.lower_pseudo_regs(operand)
-            case AsmBinary(_, src, dst):
-                ast_node.src = self.lower_pseudo_regs(src)
-                ast_node.dst = self.lower_pseudo_regs(dst)
-            case AsmIdiv(src):
-                ast_node.src = self.lower_pseudo_regs(src)
-            case AsmProgram(function_definition = function_definition):
-                self.lower_pseudo_regs(function_definition)
-            case AsmFunction(name = name, instructions = instructions):
-                for instruction in instructions:
-                    self.lower_pseudo_regs(instruction)
-            case _:
-                return ast_node
+    def _allocate_stack_slot(self, identifier):
+        if identifier not in self.identifiers:
+            self.stack_counter -= 4
+            self.identifiers[identifier] = self.stack_counter
+        return self.identifiers[identifier]
+
+    def lower_pseudo_regs(self, program):
+        def remove_pseudos(ast_node):
+            match ast_node:
+                case AsmPseudo(identifier):
+                    stack_offset = self._allocate_stack_slot(identifier)
+                    return AsmStack(stack_offset)
+                case AsmMov(src, dst):
+                    return AsmMov(remove_pseudos(src), remove_pseudos(dst))
+                case AsmUnary(unop, operand):
+                    return AsmUnary(unop, remove_pseudos(operand))
+                case AsmBinary(binop, src, dst):
+                    return AsmBinary(binop, remove_pseudos(src), remove_pseudos(dst))
+                case AsmIdiv(src):
+                    return AsmIdiv(remove_pseudos(src))
+                case _:
+                    return ast_node
+        instructions = program.function_definition.instructions
+        lowered_instrs = [remove_pseudos(instr) for instr in instructions]
+        program.function_definition.instructions = lowered_instrs
             
 def lower_to_asm(ast_node):
     match ast_node:
         # TODO Remove all the redundant "function = f" pattern in this file
-        case IRProgram(function = f):
-            return AsmProgram(lower_to_asm(f))
-        case IRFunctionDefinition(name = name, body = instructions):
+        case IRProgram(func):
+            return AsmProgram(lower_to_asm(func))
+        case IRFunctionDefinition(name, instructions):
             asm_instructions = []
             for instruction in instructions:
                 asm_instructions += lower_instr(instruction)
@@ -77,13 +77,13 @@ def lower_to_asm(ast_node):
         
 def lower_instr(ast_node):
     match ast_node:
-        case IRReturn(val = val):
+        case IRReturn(val):
             val = lower_operand(val)
             return [AsmMov(val, AsmReg(AsmRegs.AX)), 
                     AsmRet()]
-        case IRUnary(unary_operator = u, src = src, dst = dst):
+        case IRUnary(unop, src, dst):
             return [AsmMov(lower_operand(src), lower_operand(dst)), 
-                    AsmUnary(lower_operator(u), lower_operand(dst))]
+                    AsmUnary(lower_operator(unop), lower_operand(dst))]
         case IRBinary(IRBinaryOperator.DIVIDE, src1, src2, dst):
             dividend_reg = AsmReg(AsmRegs.AX)
             return [AsmMov(lower_operand(src1), dividend_reg),
@@ -121,9 +121,9 @@ def lower_operator(ast_node):
         
 def lower_operand(ast_node):
     match ast_node:
-        case IRConstant(int = constant):
+        case IRConstant(constant):
             return AsmImm(constant)
-        case IRVar(identifier = identifier):
+        case IRVar(identifier):
             return AsmPseudo(identifier)
         case _:
             raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
