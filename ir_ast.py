@@ -5,18 +5,7 @@ from typing import List
 from enum import Enum, auto
 
 class TackyNode(ABC):
-    def __str__(self, level = 0):
-        def indent(text, level):
-            prefix = "   "
-            return "\n".join(prefix * level + line for line in text.splitlines())
-        
-        class_name = self.__class__.__name__
-        fields = self.__dict__.items()
-        field_strings = []
-        for _, value in fields:
-            field_strings.append(f"{value}")
-        body = "\n".join(field_strings)
-        return f"{indent(class_name + '(', level)}\n{indent(body, level + 1)}\n{indent(')', level)}"
+    pass
 
 @dataclass
 class IRProgram(TackyNode):
@@ -27,22 +16,9 @@ class IRFunctionDefinition(TackyNode):
     name: str
     body: List[IRInstruction]
     
-    def __str__(self):
-        def indent(text, level):
-            prefix = "   "
-            return "\n".join(prefix * level + str(line) for line in text)
-        return f"IRFunctionDefinition(\n{indent(['name: ' + self.name], 1)}\n{indent(['instructions:'], 1)}\n{indent(self.body, 2)}"
-        
-
 
 class IRInstruction(TackyNode):
-    def __str__(self):
-        class_name = self.__class__.__name__
-        fields = self.__dict__.items()
-        field_strings = []
-        for _, field in fields:
-            field_strings.append(f"{field}")
-        return f"{class_name}(" + ", ".join(field_strings) + ")"
+    pass
 
 @dataclass
 class IRReturn(IRInstruction):
@@ -64,10 +40,7 @@ class IRBinary(IRInstruction):
 
 
 class IRVal(TackyNode):
-    def __str__(self):
-        class_name = self.__class__.__name__
-        value, = self.__dict__.values()
-        return f"{class_name}({value})"
+    pass
 
 @dataclass
 class IRConstant(IRVal):
@@ -82,9 +55,6 @@ class IRVar(IRVal):
 class IRUnaryOperator(Enum):
     Complement  = auto()
     Negate      = auto()
-
-    def __str__(self):
-        return f"{self.name}"
     
 class IRBinaryOperator(Enum):
     Add         = auto()
@@ -92,7 +62,4 @@ class IRBinaryOperator(Enum):
     Multiply    = auto()
     Divide      = auto()
     Remainder   = auto()
-
-    def __str__(self):
-        return f"{self.name}"
-    
+        

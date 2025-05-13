@@ -6,19 +6,7 @@ from dataclasses import dataclass
 # TODO Write common pretty printer for all ASTs
 
 class ASTNode(ABC):
-    def __str__(self, level = 0):
-        def indent(text, level):
-            prefix = "   "
-            return "\n".join(prefix * level + line for line in text.splitlines())
-        
-        class_name = self.__class__.__name__
-        fields = self.__dict__.items()
-        field_strings = []
-        for _, value in fields:
-            field_strings.append(f"{value}")
-        body = "\n".join(field_strings)
-        return f"{indent(class_name + '(', level)}\n{indent(body, level + 1)}\n{indent(')', level)}"
-
+    pass
 
 @dataclass
 class Program(ASTNode):

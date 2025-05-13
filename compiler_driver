@@ -41,7 +41,7 @@ def main():
             preprocessed = preprocess(file)
             compiled = compiler.compile_c(preprocessed,stage)
             subprocess.run(["rm",preprocessed], stdout=subprocess.PIPE)
-            if stage == "all":
+            if stage in ["all", "testall"]:
                 assemble(compiled)
     except RuntimeError as err:
         print(f"Error {err}")

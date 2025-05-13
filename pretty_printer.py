@@ -24,6 +24,7 @@ def print_node(node, level = 0, in_list = False):
         return print_list(node, level)
     if isinstance(node, Enum):
         return indent(node.name, level)
+    
     class_name = node.__class__.__name__
     vals = node.__dict__.values()
     if all(is_simple(val) for val in vals) or in_list:
