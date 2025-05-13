@@ -66,7 +66,6 @@ class AsmAllocator():
             
 def lower_to_asm(ast_node):
     match ast_node:
-        # TODO Remove all the redundant "function = f" pattern in this file
         case IRProgram(func):
             return AsmProgram(lower_to_asm(func))
         case IRFunctionDefinition(name, instructions):
@@ -129,11 +128,11 @@ def lower_operand(ast_node):
         
 def emit_code(ast_node):
     match ast_node:
-        case AsmProgram(function_definition = function_definition):
+        case AsmProgram(function_definition):
             res = emit_code(function_definition)
             res += '   .section .note.GNU-stack,"",@progbits\n'
             return res
-        case AsmFunction(name = name, instructions = instructions):
+        case AsmFunction(name, instructions):
             res =   f"   .globl {name}\n"
             res +=  f"{name}:\n"
             res +=  f"   pushq  %rbp\n"
@@ -141,7 +140,7 @@ def emit_code(ast_node):
             for instruction in instructions:
                 res += emit_code(instruction)
             return res
-        case AsmMov(src = src, dst = dst):
+        case AsmMov(src, dst):
             src_operand = emit_code(src)
             dst_operand = emit_code(dst)
             return  f"   movl   {src_operand}, {dst_operand}\n"
@@ -150,8 +149,8 @@ def emit_code(ast_node):
             res +=  f"   popq   %rbp\n"
             res +=  f"   ret\n"
             return res
-        case AsmUnary(unary_operator = unary_operator, operand = operand):
-            unary_instruction = emit_code(unary_operator)
+        case AsmUnary(unop, operand):
+            unary_instruction = emit_code(unop)
             asm_operand = emit_code(operand)
             res =   f"   {unary_instruction}   {asm_operand}\n"
             return res
@@ -164,7 +163,7 @@ def emit_code(ast_node):
             return  f"   idivl  {operand}\n"
         case AsmCdq():
             return  f"   cdq\n"
-        case AsmAllocateStack(int = int):
+        case AsmAllocateStack(int):
             res =  f"   subq   ${int},  %rsp\n"
             return res
         case AsmUnaryOperator.Neg:
@@ -177,17 +176,17 @@ def emit_code(ast_node):
             return "subl"
         case AsmBinaryOperator.Mult:
             return "imull"
-        case AsmReg(reg = AsmRegs.AX):
+        case AsmReg(AsmRegs.AX):
             return f"%eax"
         case AsmReg(AsmRegs.DX):
             return f"%edx"
-        case AsmReg(reg = AsmRegs.R10):
+        case AsmReg(AsmRegs.R10):
             return f"%r10d"
-        case AsmReg(reg = AsmRegs.R11):
+        case AsmReg(AsmRegs.R11):
             return f"%r11d"
-        case AsmStack(int = int):
+        case AsmStack(int):
             return f"{int}(%rbp)"
-        case AsmImm(int = int):
+        case AsmImm(int):
             return f"${int}"
         case _:
             raise NotImplementedError(f"Cant generate assembly code for {ast_node}")

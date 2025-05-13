@@ -3,7 +3,6 @@ from abc import ABC
 from enum import Enum, auto
 from dataclasses import dataclass
 
-# TODO Write common pretty printer for all ASTs
 
 class ASTNode(ABC):
     pass
