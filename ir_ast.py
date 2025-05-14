@@ -37,6 +37,29 @@ class IRBinary(IRInstruction):
     src2: IRVal
     dst: IRVal
 
+@dataclass
+class IRCopy(IRInstruction):
+    src: IRVal
+    dst: IRVal
+
+@dataclass
+class IRJump(IRInstruction):
+    target: str
+
+@dataclass
+class IRJumpIfZero(IRInstruction):
+    condition: IRVal
+    target: str
+
+@dataclass
+class IRJumpIfNotZero(IRInstruction):
+    condition: IRVal
+    target: str
+
+@dataclass
+class IRLabel(IRInstruction):
+    identifier: str
+
 
 
 class IRVal(TackyNode):
@@ -55,11 +78,18 @@ class IRVar(IRVal):
 class IRUnaryOperator(Enum):
     Complement  = auto()
     Negate      = auto()
+    Not         = auto()
     
 class IRBinaryOperator(Enum):
-    Add         = auto()
-    Subtract    = auto()
-    Multiply    = auto()
-    Divide      = auto()
-    Remainder   = auto()
+    Add             = auto()
+    Subtract        = auto()
+    Multiply        = auto()
+    Divide          = auto()
+    Remainder       = auto()
+    Equal           = auto()
+    NotEqual        = auto()
+    LessThan        = auto()
+    LessOrEqual     = auto()
+    GreaterThan     = auto()
+    GreaterOrEqual  = auto()
         
