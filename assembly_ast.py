@@ -49,13 +49,13 @@ class AsmRet(AsmInstruction):
 
 
 class AsmUnaryOperator(Enum):
-    Neg = auto()
-    Not = auto()
+    Neg = "negl"
+    Not = "notl"
 
 class AsmBinaryOperator(Enum):
-    Add = auto()
-    Sub = auto()
-    Mult = auto()
+    Add = "addl"
+    Sub = "subl"
+    Mult = "imull"
 
 
 
@@ -81,7 +81,7 @@ class AsmStack(AsmOperand):
     
     
 class AsmRegs(Enum):
-    AX = auto()
-    DX = auto()
-    R10 = auto()
-    R11 = auto()
+    AX = f"%eax"
+    DX = f"%edx"
+    R10 = f"%r10d"
+    R11 = f"%r11d"

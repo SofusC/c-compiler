@@ -126,6 +126,24 @@ def lower_operand(ast_node):
         case _:
             raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
         
+def emit_function(name, instructions):
+    res =   f"   .globl {name}\n"
+    res +=  f"{name}:\n"
+    res +=  f"   pushq  %rbp\n"
+    res +=  f"   movq   %rsp, %rbp\n"
+    for instruction in instructions:
+        res += emit_code(instruction)
+    return res
+    
+def emit_operand(operand):
+    match operand:
+        case AsmReg(reg):
+            return reg.value
+        case AsmStack(offset):
+            return f"{offset}(%rbp)"
+        case AsmImm(int):
+            return f"${int}"
+        
 def emit_code(ast_node):
     match ast_node:
         case AsmProgram(function_definition):
@@ -133,13 +151,7 @@ def emit_code(ast_node):
             res += '   .section .note.GNU-stack,"",@progbits\n'
             return res
         case AsmFunction(name, instructions):
-            res =   f"   .globl {name}\n"
-            res +=  f"{name}:\n"
-            res +=  f"   pushq  %rbp\n"
-            res +=  f"   movq   %rsp, %rbp\n"
-            for instruction in instructions:
-                res += emit_code(instruction)
-            return res
+            return emit_function(name, instructions)
         case AsmMov(src, dst):
             src_operand = emit_code(src)
             dst_operand = emit_code(dst)
@@ -150,43 +162,24 @@ def emit_code(ast_node):
             res +=  f"   ret\n"
             return res
         case AsmUnary(unop, operand):
-            unary_instruction = emit_code(unop)
+            unop = emit_code(unop)
             asm_operand = emit_code(operand)
-            res =   f"   {unary_instruction}   {asm_operand}\n"
+            res =   f"   {unop}   {asm_operand}\n"
             return res
         case AsmBinary(binop, src, dst):
             binop = emit_code(binop)
             src, dst = emit_code(src), emit_code(dst)
-            return  f"   {binop}    {src}, {dst}\n"
+            return  f"   {binop}   {src}, {dst}\n"
         case AsmIdiv(operand):
             operand = emit_code(operand)
             return  f"   idivl  {operand}\n"
         case AsmCdq():
             return  f"   cdq\n"
         case AsmAllocateStack(int):
-            res =  f"   subq   ${int},  %rsp\n"
-            return res
-        case AsmUnaryOperator.Neg:
-            return "negl"
-        case AsmUnaryOperator.Not:
-            return "notl"
-        case AsmBinaryOperator.Add:
-            return "addl"
-        case AsmBinaryOperator.Sub:
-            return "subl"
-        case AsmBinaryOperator.Mult:
-            return "imull"
-        case AsmReg(AsmRegs.AX):
-            return f"%eax"
-        case AsmReg(AsmRegs.DX):
-            return f"%edx"
-        case AsmReg(AsmRegs.R10):
-            return f"%r10d"
-        case AsmReg(AsmRegs.R11):
-            return f"%r11d"
-        case AsmStack(int):
-            return f"{int}(%rbp)"
-        case AsmImm(int):
-            return f"${int}"
+            return  f"   subq   ${int},  %rsp\n"
+        case AsmOperand() as operand:
+            return emit_operand(operand)
+        case AsmUnaryOperator() | AsmBinaryOperator() as op:
+            return op.value
         case _:
             raise NotImplementedError(f"Cant generate assembly code for {ast_node}")
