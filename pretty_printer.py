@@ -11,11 +11,10 @@ def indent(text, level):
     return "    " * level + text
 
 def print_list(list, level = 0):
-    res = indent("instructions:", level)
+    lines = [indent("instructions:", level)]
     for elem in list:
-        res += "\n"
-        res += print_node(elem, level + 1, True)
-    return res
+        lines.append(print_node(elem, level + 1, True))
+    return "\n".join(lines)
 
 def print_node(node, level = 0, in_list = False):
     if is_simple(node):
@@ -26,19 +25,16 @@ def print_node(node, level = 0, in_list = False):
         return indent(node.name, level)
     
     class_name = node.__class__.__name__
-    vals = node.__dict__.values()
-    if all(is_simple(val) for val in vals) or in_list:
-        return indent(f"{class_name}(" + ", ".join(str(val) for val in vals) + ")",level)
+    values = node.__dict__.values()
 
-    res = indent(f"{class_name}(", level)
+    inline = all(is_simple(val) for val in values) or in_list
+    if inline:
+        return indent(f"{class_name}(" + ", ".join(print_node(val, 0, True) for val in values) + ")",level)
 
-    for key, val in node.__dict__.items():
-        res += "\n"
-        if is_simple(val):
-            res += indent(str(val), level + 1)
-        else:
-            res += print_node(val, level + 1)
-    res += "\n"
-    res += indent(")", level)
-    return res
+    lines = [indent(f"{class_name}(", level)]
+
+    for val in values:
+        lines.append(print_node(val, level + 1))
+    lines.append(indent(")", level))
+    return "\n".join(lines)
     
