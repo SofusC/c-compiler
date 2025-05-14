@@ -23,6 +23,16 @@ class TokenType(Enum):
     FORWARD_SLASH   = r"/"
     PERCENT_SIGN    = r"%"
 
+    TWO_EQUAL_SIGNS     = r"=="
+    EXCLAM_POINT_EQUAL  = r"!="
+    EXCLAMATION_POINT   = r"!"
+    TWO_AMPERSANDS      = r"&&"
+    TWO_VERT_BARS       = r"\|\|"
+    LESS_THAN_OR_EQ     = r"<="
+    LESS_THAN           = r"<"
+    GREATER_THAN_OR_EQ  = r">="
+    GREATER_THAN        = r">"
+
     MISMATCH        = r"\S+"
 
 
