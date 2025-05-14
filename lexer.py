@@ -3,25 +3,25 @@ from enum import Enum
 from dataclasses import dataclass
 
 class TokenType(Enum):
-    RETURN          = r"return\b"
-    VOID            = r"void\b"
-    INT             = r"int\b"
-    CONSTANT        = r"[0-9]+\b"
-    IDENTIFIER      = r"[a-zA-Z_]\w*\b"
-    OPEN_PAREN      = r"\("
-    CLOSE_PAREN     = r"\)"
-    OPEN_BRACE      = r"{"
-    CLOSE_BRACE     = r"}"
-    SEMICOLON       = r";"
+    RETURN              = r"return\b"
+    VOID                = r"void\b"
+    INT                 = r"int\b"
+    CONSTANT            = r"[0-9]+\b"
+    IDENTIFIER          = r"[a-zA-Z_]\w*\b"
+    OPEN_PAREN          = r"\("
+    CLOSE_PAREN         = r"\)"
+    OPEN_BRACE          = r"{"
+    CLOSE_BRACE         = r"}"
+    SEMICOLON           = r";"
 
-    TILDE           = r"~"
-    HYPHEN          = r"-"
-    DECREMENT       = r"--"
+    TILDE               = r"~"
+    DECREMENT           = r"--"
+    HYPHEN              = r"-"
 
-    PLUS            = r"\+"
-    ASTERISK        = r"\*"
-    FORWARD_SLASH   = r"/"
-    PERCENT_SIGN    = r"%"
+    PLUS                = r"\+"
+    ASTERISK            = r"\*"
+    FORWARD_SLASH       = r"/"
+    PERCENT_SIGN        = r"%"
 
     TWO_EQUAL_SIGNS     = r"=="
     EXCLAM_POINT_EQUAL  = r"!="
@@ -33,7 +33,7 @@ class TokenType(Enum):
     GREATER_THAN_OR_EQ  = r">="
     GREATER_THAN        = r">"
 
-    MISMATCH        = r"\S+"
+    MISMATCH            = r"\S+"
 
 
 PATTERN = re.compile("|".join(f"(?P<{tt.name}>{tt.value})" for tt in list(TokenType)))

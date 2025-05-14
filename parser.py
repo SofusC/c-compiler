@@ -7,11 +7,19 @@ from c_ast import *
 class Parser:
     tokens: List[Token]
     PRECEDENCE = {
-        TokenType.ASTERISK:         50,
-        TokenType.FORWARD_SLASH:    50,
-        TokenType.PERCENT_SIGN:     50,
-        TokenType.PLUS:             45,
-        TokenType.HYPHEN:           45,
+        TokenType.ASTERISK:             50,
+        TokenType.FORWARD_SLASH:        50,
+        TokenType.PERCENT_SIGN:         50,
+        TokenType.PLUS:                 45,
+        TokenType.HYPHEN:               45,
+        TokenType.LESS_THAN:            35,
+        TokenType.LESS_THAN_OR_EQ:      35,
+        TokenType.GREATER_THAN:         35,
+        TokenType.GREATER_THAN_OR_EQ:   35,
+        TokenType.TWO_EQUAL_SIGNS:      30,
+        TokenType.EXCLAM_POINT_EQUAL:   30,
+        TokenType.TWO_AMPERSANDS:       10,
+        TokenType.TWO_VERT_BARS:         5,
     }
 
     def is_binary(self, token) -> bool:
@@ -41,9 +49,26 @@ class Parser:
                 return BinaryOperator.Add
             case TokenType.HYPHEN:
                 return BinaryOperator.Subtract
+            case TokenType.TWO_AMPERSANDS:
+                return BinaryOperator.And
+            case TokenType.TWO_VERT_BARS:
+                return BinaryOperator.Or
+            case TokenType.TWO_EQUAL_SIGNS:
+                return BinaryOperator.Equal
+            case TokenType.EXCLAM_POINT_EQUAL:
+                return BinaryOperator.NotEqual
+            case TokenType.LESS_THAN:
+                return BinaryOperator.LessThan
+            case TokenType.LESS_THAN_OR_EQ:
+                return BinaryOperator.LessOrEqual
+            case TokenType.GREATER_THAN:
+                return BinaryOperator.GreaterThan
+            case TokenType.GREATER_THAN_OR_EQ:
+                return BinaryOperator.GreaterOrEqual
+            
 
     def parse_factor(self) -> Exp:
-        token = self.expect([TokenType.CONSTANT, TokenType.TILDE, TokenType.HYPHEN, TokenType.OPEN_PAREN])
+        token = self.expect([TokenType.CONSTANT, TokenType.TILDE, TokenType.HYPHEN, TokenType.EXCLAMATION_POINT, TokenType.OPEN_PAREN])
         match token.token_type:
             case TokenType.CONSTANT:
                 return Constant(token.value)
@@ -51,6 +76,8 @@ class Parser:
                 return Unary(UnaryOperator.Complement, self.parse_factor())
             case TokenType.HYPHEN:
                 return Unary(UnaryOperator.Negate, self.parse_factor())
+            case TokenType.EXCLAMATION_POINT:
+                return Unary(UnaryOperator.Not, self.parse_factor())
             case TokenType.OPEN_PAREN:
                 exp = self.parse_exp()
                 self.expect(TokenType.CLOSE_PAREN)

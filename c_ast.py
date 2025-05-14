@@ -44,6 +44,7 @@ class Unary(Exp):
 class UnaryOperator(Enum):
     Complement  = auto()
     Negate      = auto()
+    Not         = auto()
 
 @dataclass
 class Binary(Exp):
@@ -52,8 +53,16 @@ class Binary(Exp):
     right_exp: Exp
 
 class BinaryOperator(Enum):
-    Add         = auto()
-    Subtract    = auto()
-    Multiply    = auto()
-    Divide      = auto()
-    Remainder   = auto()
+    Add             = auto()
+    Subtract        = auto()
+    Multiply        = auto()
+    Divide          = auto()
+    Remainder       = auto()
+    And             = auto()
+    Or              = auto()
+    Equal           = auto()
+    NotEqual        = auto()
+    LessThan        = auto()
+    LessOrEqual     = auto()
+    GreaterThan     = auto()
+    GreaterOrEqual  = auto()
