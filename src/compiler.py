@@ -29,10 +29,13 @@ def compile_c(file, flag):
     if flag == "lex":
         [print(token) for token in tokens]
     elif flag == "parse":
+        print("C AST:")
         pretty_printer.printer(ast)
     elif flag == "tacky":
+        print("Tacky AST:")
         pretty_printer.printer(emitted_ir)
     elif flag == "codegen":
+        print("Assembly AST:")
         pretty_printer.printer(asm)
     elif flag == "testall":
         print("C AST:")

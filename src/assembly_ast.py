@@ -12,6 +12,8 @@ class AsmFunction():
     name: str
     instructions: List[AsmInstruction]
 
+
+
 class AsmInstruction():
     pass
 
@@ -35,10 +37,8 @@ class AsmBinary(AsmInstruction):
 class AsmIdiv(AsmInstruction):
     src: AsmOperand
 
-    
 class AsmCdq(AsmInstruction):
     pass
-
     
 @dataclass
 class AsmAllocateStack(AsmInstruction):
@@ -46,6 +46,7 @@ class AsmAllocateStack(AsmInstruction):
 
 class AsmRet(AsmInstruction):
     pass
+
 
 
 class AsmUnaryOperator(Enum):
