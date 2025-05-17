@@ -1,5 +1,5 @@
 from __future__ import annotations
-from enum import Enum, auto
+from enum import Enum
 from dataclasses import dataclass
 from typing import List
 
@@ -34,11 +34,34 @@ class AsmBinary(AsmInstruction):
     dst: AsmOperand
 
 @dataclass
+class AsmCmp(AsmInstruction):
+    operand1: AsmOperand
+    operand2: AsmOperand
+
+@dataclass
 class AsmIdiv(AsmInstruction):
     src: AsmOperand
 
 class AsmCdq(AsmInstruction):
     pass
+
+@dataclass
+class AsmJmp(AsmInstruction):
+    identifier: str
+
+@dataclass
+class AsmJmpCC(AsmInstruction):
+    cond_code: AsmCondCode
+    identifier: str
+
+@dataclass
+class AsmSetCC(AsmInstruction):
+    cond_code: AsmCondCode
+    operand: AsmOperand
+
+@dataclass
+class AsmLabel(AsmInstruction):
+    identifier: str
     
 @dataclass
 class AsmAllocateStack(AsmInstruction):
@@ -79,7 +102,14 @@ class AsmPseudo(AsmOperand):
 class AsmStack(AsmOperand):
     int: int
 
-    
+
+class AsmCondCode(Enum):
+    E  = f"e"
+    NE = f"ne"
+    G  = f"g"
+    GE = f"ge"
+    L  = f"l"
+    LE = f"le"
     
 class AsmRegs(Enum):
     AX = f"%eax"

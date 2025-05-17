@@ -21,6 +21,14 @@ class AsmAllocator():
                     return [AsmMov(dst, tmp), 
                             AsmBinary(AsmBinaryOperator.Mult, src, tmp),
                             AsmMov(tmp, dst)]
+                case AsmCmp(AsmStack() as operand1, AsmStack() as operand2):
+                    tmp = AsmReg(AsmRegs.R10)
+                    return [AsmMov(operand1, tmp),
+                            AsmCmp(tmp, operand2)]
+                case AsmCmp(operand1, AsmImm() as operand2):
+                    tmp = AsmReg(AsmRegs.R11)
+                    return [AsmMov(operand2, tmp),
+                            AsmCmp(operand1, tmp)]
                 case AsmIdiv(AsmImm() as operand):
                     tmp = AsmReg(AsmRegs.R10)
                     return [AsmMov(operand, tmp),
@@ -44,24 +52,32 @@ class AsmAllocator():
             self.identifiers[identifier] = self.stack_counter
         return self.identifiers[identifier]
 
-    def lower_pseudo_regs(self, program):
+    def lower_pseudo_regs(self, program): # TODO: this function needs refactoring
         def remove_pseudos(ast_node):
             match ast_node:
                 case AsmPseudo(identifier):
                     stack_offset = self._allocate_stack_slot(identifier)
                     return AsmStack(stack_offset)
+                case _:
+                    return ast_node
+        def check_instruction(instruction):
+            match instruction:
                 case AsmMov(src, dst):
                     return AsmMov(remove_pseudos(src), remove_pseudos(dst))
                 case AsmUnary(unop, operand):
                     return AsmUnary(unop, remove_pseudos(operand))
                 case AsmBinary(binop, src, dst):
                     return AsmBinary(binop, remove_pseudos(src), remove_pseudos(dst))
+                case AsmCmp(operand1, operand2):
+                    return AsmCmp(remove_pseudos(operand1), remove_pseudos(operand2))
                 case AsmIdiv(src):
                     return AsmIdiv(remove_pseudos(src))
+                case AsmSetCC(cond_code, operand):
+                    return AsmSetCC(cond_code, remove_pseudos(operand))
                 case _:
-                    return ast_node
+                    return instruction
         instructions = program.function_definition.instructions
-        lowered_instrs = [remove_pseudos(instr) for instr in instructions]
+        lowered_instrs = [check_instruction(instr) for instr in instructions]
         program.function_definition.instructions = lowered_instrs
             
 def lower_to_asm(ast_node):
@@ -81,24 +97,74 @@ def lower_instr(ast_node):
             return [AsmMov(val, AsmReg(AsmRegs.AX)), 
                     AsmRet()]
         case IRUnary(unop, src, dst):
+            return lower_unary(unop, src, dst)
+        case IRBinary(binop, src1, src2, dst):
+            return lower_binary(binop, src1, src2, dst)
+        case IRJump(target):
+            return [AsmJmp(target)]
+        case IRJumpIfZero(condition, target):
+            return [AsmCmp(AsmImm(0), lower_operand(condition)),
+                    AsmJmpCC(AsmCondCode.E, target)]
+        case IRJumpIfNotZero(condition, target):
+            return [AsmCmp(AsmImm(0), lower_operand(condition)),
+                    AsmJmpCC(AsmCondCode.NE, target)]
+        case IRCopy(src, dst):
+            return [AsmMov(lower_operand(src), lower_operand(dst))]
+        case IRLabel(identifier):
+            return [AsmLabel(identifier)]
+        case _:
+            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
+        
+
+def lower_unary(unop, src, dst):
+    match unop:
+        case IRUnaryOperator.Not:
+            return [AsmCmp(AsmImm(0), src),
+                    AsmMov(AsmImm(0), dst),
+                    AsmSetCC(AsmCondCode.E, dst)]
+        case _:
             return [AsmMov(lower_operand(src), lower_operand(dst)), 
                     AsmUnary(lower_operator(unop), lower_operand(dst))]
-        case IRBinary(IRBinaryOperator.Divide, src1, src2, dst):
+
+        
+def lower_binary(binop, src1, src2, dst):
+    src1, src2, dst = lower_operand(src1), lower_operand(src2), lower_operand(dst)
+    match binop:
+        case IRBinaryOperator.Divide:
             dividend_reg = AsmReg(AsmRegs.AX)
-            return [AsmMov(lower_operand(src1), dividend_reg),
+            return [AsmMov(src1, dividend_reg),
                     AsmCdq(),
-                    AsmIdiv(lower_operand(src2)),
-                    AsmMov(dividend_reg, lower_operand(dst))]
-        case IRBinary(IRBinaryOperator.Remainder, src1, src2, dst):
-            return [AsmMov(lower_operand(src1), AsmReg(AsmRegs.AX)),
+                    AsmIdiv(src2),
+                    AsmMov(dividend_reg, dst)]
+        case IRBinaryOperator.Remainder:
+            return [AsmMov(src1, AsmReg(AsmRegs.AX)),
                     AsmCdq(),
-                    AsmIdiv(lower_operand(src2)),
-                    AsmMov(AsmReg(AsmRegs.DX), lower_operand(dst))]
-        case IRBinary(binary_operator, src1, src2, dst):
-            asm_binop = lower_operator(binary_operator)
-            asm_dst = lower_operand(dst)
-            return [AsmMov(lower_operand(src1), asm_dst),
-                    AsmBinary(asm_binop, lower_operand(src2), asm_dst)]
+                    AsmIdiv(src2),
+                    AsmMov(AsmReg(AsmRegs.DX), dst)]
+        case relational if binop.is_relational:
+            relational = lower_relational(relational)
+            return [AsmCmp(src2, src1),
+                    AsmMov(AsmImm(0), dst),
+                    AsmSetCC(relational, dst)]
+        case _:
+            binop = lower_operator(binop)
+            return [AsmMov(src1, dst),
+                    AsmBinary(binop, src2, dst)]
+
+def lower_relational(ast_node):
+    match ast_node:
+        case IRBinaryOperator.Equal:
+            return AsmCondCode.E
+        case IRBinaryOperator.NotEqual:
+            return AsmCondCode.NE
+        case IRBinaryOperator.LessThan:
+            return AsmCondCode.L
+        case IRBinaryOperator.LessOrEqual:
+            return AsmCondCode.LE
+        case IRBinaryOperator.GreaterThan:
+            return AsmCondCode.G
+        case IRBinaryOperator.GreaterOrEqual:
+            return AsmCondCode.GE
         case _:
             raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
 
@@ -144,7 +210,7 @@ def emit_operand(operand):
         case AsmImm(int):
             return f"${int}"
         
-def emit_code(ast_node):
+def emit_code(ast_node): # TODO: Move this to a code_emitter.py file
     match ast_node:
         case AsmProgram(function_definition):
             res = emit_code(function_definition)

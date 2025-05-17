@@ -86,10 +86,15 @@ class IRBinaryOperator(Enum):
     Multiply        = auto()
     Divide          = auto()
     Remainder       = auto()
+    
     Equal           = auto()
     NotEqual        = auto()
     LessThan        = auto()
     LessOrEqual     = auto()
     GreaterThan     = auto()
     GreaterOrEqual  = auto()
+
+    @property
+    def is_relational(self):
+        return self in {IRBinaryOperator.Equal, IRBinaryOperator.NotEqual, IRBinaryOperator.LessThan, IRBinaryOperator.LessOrEqual, IRBinaryOperator.GreaterThan, IRBinaryOperator.GreaterOrEqual}
         
