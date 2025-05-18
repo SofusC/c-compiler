@@ -25,7 +25,7 @@ def compile_c(file, flag):
     if flag in ["all", "testall"]:
         output = file[:-2] + ".s"
         with open(output, "w") as f:
-            assembly_code = code_emitter.emit_code(asm)
+            assembly_code = code_emitter.emit_program_code(asm)
             f.write(assembly_code)
 
     if flag == "lex":
