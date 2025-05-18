@@ -25,11 +25,10 @@ def emit_code(ast_node):
                    f"ret"]
             return res
         case AsmUnary(unop, operand):
-            return [f"{emit_code(unop)}   {emit_code(operand)}"]
+            return [f"{unop.value}   {emit_code(operand)}"]
         case AsmBinary(binop, src, dst):
-            binop = emit_code(binop)
             src, dst = emit_code(src), emit_code(dst)
-            return [f"{binop}   {src}, {dst}"]
+            return [f"{binop.value}   {src}, {dst}"]
         case AsmIdiv(operand):
             return [f"idivl  {emit_code(operand)}"]
         case AsmCdq():
@@ -38,8 +37,6 @@ def emit_code(ast_node):
             return [f"subq   ${int},  %rsp"]
         case AsmOperand() as operand:
             return emit_operand(operand)
-        case AsmUnaryOperator() | AsmBinaryOperator() as op:
-            return op.value
         case AsmCmp(operand1, operand2):
             return [f"cmpl   {emit_code(operand1)}, {emit_code(operand2)}"]
         case AsmJmp(label):

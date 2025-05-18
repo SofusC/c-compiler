@@ -4,42 +4,47 @@ class AsmAllocator():
     def __init__(self):
         self.identifiers = {}
         self.stack_counter = 0
-        
+
+    def _two_stack_operands(self, instruction):
+        tmp = AsmReg(AsmRegs.R10)
+        match instruction:
+            case AsmMov(src, dst):
+                return [AsmMov(src, tmp), 
+                        AsmMov(tmp, dst)]
+            case AsmBinary(binop, src, dst):
+                return [AsmMov(src, tmp), 
+                        AsmBinary(binop, tmp, dst)]
+            case AsmCmp(src, dst):
+                return [AsmMov(src, tmp),
+                        AsmCmp(tmp, dst)]
+
+    def _legalize(self, instruction):
+        match instruction:
+            case AsmMov(AsmStack(), AsmStack()) | AsmCmp(AsmStack(), AsmStack()):
+                return self._two_stack_operands(instruction)
+            case AsmBinary(binop, AsmStack(), AsmStack()) if binop in (AsmBinaryOperator.Add, AsmBinaryOperator.Sub):
+                return self._two_stack_operands(instruction)
+            case AsmBinary(AsmBinaryOperator.Mult, src, AsmStack() as dst):
+                tmp = AsmReg(AsmRegs.R11)
+                return [AsmMov(dst, tmp), 
+                        AsmBinary(AsmBinaryOperator.Mult, src, tmp),
+                        AsmMov(tmp, dst)]
+            case AsmCmp(operand1, AsmImm() as operand2):
+                tmp = AsmReg(AsmRegs.R11)
+                return [AsmMov(operand2, tmp),
+                        AsmCmp(operand1, tmp)]
+            case AsmIdiv(AsmImm() as operand):
+                tmp = AsmReg(AsmRegs.R10)
+                return [AsmMov(operand, tmp),
+                        AsmIdiv(tmp)]
+            case _:
+                return [instruction]
+    
     def legalize_operands(self, program):
-        def legalize(instruction):
-            match instruction:
-                case AsmMov(AsmStack() as src, AsmStack() as dst):
-                    tmp = AsmReg(AsmRegs.R10)
-                    return [AsmMov(src, tmp), 
-                            AsmMov(tmp, dst)]
-                case AsmBinary(AsmBinaryOperator.Add | AsmBinaryOperator.Sub as binop, AsmStack() as src, AsmStack() as dst):
-                    tmp = AsmReg(AsmRegs.R10)
-                    return [AsmMov(src, tmp), 
-                            AsmBinary(binop, tmp, dst)]
-                case AsmBinary(AsmBinaryOperator.Mult, src, AsmStack() as dst):
-                    tmp = AsmReg(AsmRegs.R11)
-                    return [AsmMov(dst, tmp), 
-                            AsmBinary(AsmBinaryOperator.Mult, src, tmp),
-                            AsmMov(tmp, dst)]
-                case AsmCmp(AsmStack() as operand1, AsmStack() as operand2):
-                    tmp = AsmReg(AsmRegs.R10)
-                    return [AsmMov(operand1, tmp),
-                            AsmCmp(tmp, operand2)]
-                case AsmCmp(operand1, AsmImm() as operand2):
-                    tmp = AsmReg(AsmRegs.R11)
-                    return [AsmMov(operand2, tmp),
-                            AsmCmp(operand1, tmp)]
-                case AsmIdiv(AsmImm() as operand):
-                    tmp = AsmReg(AsmRegs.R10)
-                    return [AsmMov(operand, tmp),
-                            AsmIdiv(tmp)]
-                case _:
-                    return [instruction]
-        
         function = program.function_definition
         new_instructions = []
         for instruction in function.instructions:
-            new_instructions.extend(legalize(instruction))
+            new_instructions.extend(self._legalize(instruction))
         function.instructions = new_instructions
 
     def add_stack_frame(self, program):
