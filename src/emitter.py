@@ -71,17 +71,17 @@ class IREmitter:
         short_circuit_result = 0 if binop == BinaryOperator.And else 1
         jump_if = IRJumpIfZero if binop == BinaryOperator.And else IRJumpIfNotZero
         v1 = self.emit_instructions(e1, instructions)
-        label = IRLabel(self.make_label(binop))
+        label = self.make_label(binop)
         instructions.append(jump_if(v1, label))
         v2 = self.emit_instructions(e2, instructions)
         instructions.append(jump_if(v2, label))
         dst = IRVar(self.make_temporary())
-        end_label = IRLabel(self.make_label())
+        end_label = self.make_label()
         instructions.extend([IRCopy(IRConstant(1 - short_circuit_result), dst),
                             IRJump(end_label),
-                            label,
+                            IRLabel(label),
                             IRCopy(IRConstant(short_circuit_result), dst),
-                            end_label])
+                            IRLabel(end_label)])
         return dst
 
     def emit_binary_instructions(self, instructions, binop, e1, e2):

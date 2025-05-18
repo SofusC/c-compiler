@@ -58,8 +58,10 @@ class BinaryOperator(Enum):
     Multiply        = auto()
     Divide          = auto()
     Remainder       = auto()
+    
     And             = auto()
     Or              = auto()
+
     Equal           = auto()
     NotEqual        = auto()
     LessThan        = auto()

@@ -2,6 +2,8 @@ import lexer
 import parser
 import emitter
 import asm_generator
+import asm_allocator
+import code_emitter
 import pretty_printer
 
 def compile_c(file, flag):
@@ -15,15 +17,15 @@ def compile_c(file, flag):
 
     if flag in ["codegen", "all", "testall"]:
         asm = asm_generator.lower_to_asm(emitted_ir)
-        allocator = asm_generator.AsmAllocator()
+        allocator = asm_allocator.AsmAllocator()
         allocator.lower_pseudo_regs(asm)
         allocator.add_stack_frame(asm)
-        allocator.legalize_instr(asm)
+        allocator.legalize_operands(asm)
 
     if flag in ["all", "testall"]:
         output = file[:-2] + ".s"
         with open(output, "w") as f:
-            assembly_code = asm_generator.emit_code(asm)
+            assembly_code = code_emitter.emit_code(asm)
             f.write(assembly_code)
 
     if flag == "lex":
