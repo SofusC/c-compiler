@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC
 from enum import Enum, auto
 from dataclasses import dataclass
+from typing import List
 
 
 class ASTNode(ABC):
@@ -16,16 +17,31 @@ class Program(ASTNode):
 @dataclass
 class FunctionDefinition(ASTNode):
     name: str
-    body: Statement
+    body: List[BlockItem]
 
 
 
-class Statement(ASTNode):
+class BlockItem(ASTNode):
+    pass
+
+@dataclass
+class Declaration(BlockItem):
+    name: str
+    init: Exp | None
+
+class Statement(BlockItem):
     pass
 
 @dataclass
 class Return(Statement):
     exp: Exp
+
+@dataclass
+class Expression(Statement):
+    exp: Exp
+
+class Null(Statement):
+    pass
 
 
 
@@ -37,20 +53,31 @@ class Constant(Exp):
     constant: int
 
 @dataclass
+class Var(Exp):
+    identifier: str
+
+@dataclass
 class Unary(Exp):
     unary_operator: UnaryOperator
     exp: Exp
-    
-class UnaryOperator(Enum):
-    Complement  = auto()
-    Negate      = auto()
-    Not         = auto()
 
 @dataclass
 class Binary(Exp):
     binary_operator: BinaryOperator
     left_exp: Exp
     right_exp: Exp
+  
+@dataclass
+class Assignment(Exp):
+    left: Exp
+    right: Exp
+
+
+
+class UnaryOperator(Enum):
+    Complement  = auto()
+    Negate      = auto()
+    Not         = auto()
 
 class BinaryOperator(Enum):
     Add             = auto()

@@ -20,6 +20,7 @@ class Parser:
         TokenType.EXCLAM_POINT_EQUAL:   30,
         TokenType.TWO_AMPERSANDS:       10,
         TokenType.TWO_VERT_BARS:         5,
+        TokenType.EQUAL_SIGN:            1,
     }
 
     def is_binary(self, token) -> bool:
@@ -33,7 +34,7 @@ class Parser:
             expected = [expected]
         actual = self.tokens.pop(0)
         if actual.token_type not in expected:
-            raise RuntimeError(f"Expected '{expected}' but found '{actual.token_type}'")
+            raise RuntimeError(f"Expected '{expected}' but found '{actual.token_type}' with {len(self.tokens)} tokens left")
         return actual
     
     def parse_binop(self) -> BinaryOperator:
@@ -68,7 +69,7 @@ class Parser:
             
 
     def parse_factor(self) -> Exp:
-        token = self.expect([TokenType.CONSTANT, TokenType.TILDE, TokenType.HYPHEN, TokenType.EXCLAMATION_POINT, TokenType.OPEN_PAREN])
+        token = self.expect([TokenType.CONSTANT, TokenType.TILDE, TokenType.HYPHEN, TokenType.EXCLAMATION_POINT, TokenType.OPEN_PAREN, TokenType.IDENTIFIER])
         match token.token_type:
             case TokenType.CONSTANT:
                 return Constant(token.value)
@@ -82,22 +83,55 @@ class Parser:
                 exp = self.parse_exp()
                 self.expect(TokenType.CLOSE_PAREN)
                 return exp
+            case TokenType.IDENTIFIER:
+                return Var(token.value)
+            
            
     def parse_exp(self, min_prec = 0) -> Exp:
         left = self.parse_factor()
         next_token = self.peek()
         while self.is_binary(next_token) and self.PRECEDENCE[next_token.token_type] >= min_prec:
-            operator = self.parse_binop()
-            right = self.parse_exp(self.PRECEDENCE[next_token.token_type] + 1)
-            left = Binary(operator, left, right)
+            if next_token.token_type == TokenType.EQUAL_SIGN:
+                self.tokens.pop(0)
+                right = self.parse_exp(self.PRECEDENCE[next_token.token_type])
+                left = Assignment(left, right)
+            else:
+                operator = self.parse_binop()
+                right = self.parse_exp(self.PRECEDENCE[next_token.token_type] + 1)
+                left = Binary(operator, left, right)
             next_token = self.peek()
         return left
+    
+    def parse_declaration(self) -> Declaration:
+        self.expect(TokenType.INT)
+        name = self.expect(TokenType.IDENTIFIER).value
+        init = None
+        if self.peek().token_type == TokenType.EQUAL_SIGN:
+            self.tokens.pop(0)
+            init = self.parse_exp()
+        self.expect(TokenType.SEMICOLON)
+        return Declaration(name, init)
 
     def parse_statement(self) -> Statement:
-        self.expect(TokenType.RETURN)
-        exp = self.parse_exp()
-        self.expect(TokenType.SEMICOLON)
-        return Return(exp)
+        match self.peek().token_type:
+            case TokenType.RETURN:
+                self.expect(TokenType.RETURN)
+                exp = self.parse_exp()
+                self.expect(TokenType.SEMICOLON)
+                return Return(exp)
+            case TokenType.SEMICOLON:
+                self.expect(TokenType.SEMICOLON)
+                return Null()
+            case _:
+                exp = self.parse_exp()
+                self.expect(TokenType.SEMICOLON)
+                return Expression(exp)
+    
+    def parse_block_item(self) -> BlockItem:
+        if self.peek().token_type == TokenType.INT:
+            return self.parse_declaration()
+        else:
+            return self.parse_statement()
  
     def parse_function_definition(self) -> FunctionDefinition:
         self.expect(TokenType.INT)
@@ -106,9 +140,12 @@ class Parser:
         self.expect(TokenType.VOID)
         self.expect(TokenType.CLOSE_PAREN)
         self.expect(TokenType.OPEN_BRACE)
-        body = self.parse_statement()
+        function_body = []
+        while self.peek().token_type != TokenType.CLOSE_BRACE:
+            next_block_item = self.parse_block_item()
+            function_body.append(next_block_item)
         self.expect(TokenType.CLOSE_BRACE)
-        return FunctionDefinition(name, body)
+        return FunctionDefinition(name, function_body)
 
 
     def parse_program(self) -> Program:

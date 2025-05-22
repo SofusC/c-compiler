@@ -33,6 +33,8 @@ class TokenType(Enum):
     GREATER_THAN_OR_EQ  = r">="
     GREATER_THAN        = r">"
 
+    EQUAL_SIGN          = r"="
+
     MISMATCH            = r"\S+"
 
 
