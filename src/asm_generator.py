@@ -10,7 +10,7 @@ def lower_to_asm(ast_node):
             for instruction in instructions:
                 asm_instructions += lower_instr(instruction)
             return AsmFunction(name, asm_instructions)
-        
+
 def lower_instr(ast_node):
     match ast_node:
         case IRReturn(val):

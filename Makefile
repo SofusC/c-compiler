@@ -11,9 +11,9 @@ else
 	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter) --stage $(stage)
 endif
 
-.PHONY: run-tests
+.PHONY: tests
 
-run-tests:
+tests:
 	PYTHONPATH=./src pytest tests/
 
 .PHONY coverage:

@@ -82,7 +82,7 @@ class Parser:
                 exp = self.parse_exp()
                 self.expect(TokenType.CLOSE_PAREN)
                 return exp
-            
+           
     def parse_exp(self, min_prec = 0) -> Exp:
         left = self.parse_factor()
         next_token = self.peek()
@@ -98,8 +98,7 @@ class Parser:
         exp = self.parse_exp()
         self.expect(TokenType.SEMICOLON)
         return Return(exp)
-
-    
+ 
     def parse_function_definition(self) -> FunctionDefinition:
         self.expect(TokenType.INT)
         name = self.expect(TokenType.IDENTIFIER).value
@@ -110,7 +109,7 @@ class Parser:
         body = self.parse_statement()
         self.expect(TokenType.CLOSE_BRACE)
         return FunctionDefinition(name, body)
-        
+
 
     def parse_program(self) -> Program:
         function = self.parse_function_definition()
