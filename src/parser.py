@@ -28,14 +28,17 @@ class Parser:
 
     def peek(self) -> Token:
         return self.tokens[0]
+    
+    def advance(self) -> Token:
+        return self.tokens.pop(0)
         
     def expect(self, expected) -> Token:
         if not isinstance(expected, Iterable):
             expected = [expected]
-        actual = self.tokens.pop(0)
-        if actual.token_type not in expected:
-            raise RuntimeError(f"Expected '{expected}' but found '{actual.token_type}' with {len(self.tokens)} tokens left")
-        return actual
+        token = self.advance()
+        if token.token_type not in expected:
+            raise RuntimeError(f"Expected '{expected}' but found '{token.token_type}' with {len(self.tokens)} tokens left")
+        return token
     
     def parse_binop(self) -> BinaryOperator:
         token = self.expect(self.PRECEDENCE.keys())
@@ -69,7 +72,13 @@ class Parser:
             
 
     def parse_factor(self) -> Exp:
-        token = self.expect([TokenType.CONSTANT, TokenType.TILDE, TokenType.HYPHEN, TokenType.EXCLAMATION_POINT, TokenType.OPEN_PAREN, TokenType.IDENTIFIER])
+        token = self.expect([
+            TokenType.CONSTANT, 
+            TokenType.TILDE, 
+            TokenType.HYPHEN, 
+            TokenType.EXCLAMATION_POINT, 
+            TokenType.OPEN_PAREN, 
+            TokenType.IDENTIFIER])
         match token.token_type:
             case TokenType.CONSTANT:
                 return Constant(token.value)
@@ -92,7 +101,7 @@ class Parser:
         next_token = self.peek()
         while self.is_binary(next_token) and self.PRECEDENCE[next_token.token_type] >= min_prec:
             if next_token.token_type == TokenType.EQUAL_SIGN:
-                self.tokens.pop(0)
+                self.advance()
                 right = self.parse_exp(self.PRECEDENCE[next_token.token_type])
                 left = Assignment(left, right)
             else:
@@ -107,7 +116,7 @@ class Parser:
         name = self.expect(TokenType.IDENTIFIER).value
         init = None
         if self.peek().token_type == TokenType.EQUAL_SIGN:
-            self.tokens.pop(0)
+            self.advance()
             init = self.parse_exp()
         self.expect(TokenType.SEMICOLON)
         return Declaration(name, init)
