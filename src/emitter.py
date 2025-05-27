@@ -1,12 +1,12 @@
 from ir_ast import *
 from c_ast import *
+from semantic_analyser import SharedCounter
 
 class IREmitter:
-    register_counter = 0
     label_counter = 0
     def make_temporary(self):
-        register_name = f"tmp.{self.register_counter}"
-        self.register_counter += 1
+        register_name = f"tmp.{SharedCounter.get_value()}"
+        SharedCounter.increment()
         return register_name
     
     def make_label(self, binop = None):

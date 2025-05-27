@@ -5,15 +5,19 @@ import asm_generator
 import asm_allocator
 import code_emitter
 import pretty_printer
+import semantic_analyser
 
 def compile_c(file, flag):
     output = None
     tokens = lexer.lex(file)
-    if flag in ["parse", "tacky", "codegen", "all", "testall"]:
+    if flag in ["parse", "validate", "tacky", "codegen", "all", "testall"]:
         ast = parser.Parser(tokens).parse_program()
 
+    if flag in ["validate", "tacky", "codegen", "all", "testall"]:
+        analysed_ast = semantic_analyser.SemanticAnalyser().validate_program(ast)
+
     if flag in ["tacky", "codegen", "all", "testall"]:
-        emitted_ir = emitter.IREmitter().emit_program(ast)
+        emitted_ir = emitter.IREmitter().emit_program(analysed_ast)
 
     if flag in ["codegen", "all", "testall"]:
         asm = asm_generator.lower_to_asm(emitted_ir)
@@ -33,6 +37,9 @@ def compile_c(file, flag):
     elif flag == "parse":
         print("C AST:")
         pretty_printer.printer(ast)
+    elif flag == "validate":
+        print("Validated C AST:")
+        pretty_printer.printer(analysed_ast)
     elif flag == "tacky":
         print("Tacky AST:")
         pretty_printer.printer(emitted_ir)

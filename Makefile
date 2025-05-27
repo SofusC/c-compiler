@@ -11,6 +11,11 @@ else
 	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter) --stage $(stage)
 endif
 
+.PHONY: c-test
+
+c-test:
+	./src/compiler_driver --$(stage) ./tests/test.c
+
 .PHONY: tests
 
 tests:
