@@ -20,6 +20,7 @@ class Parser:
         TokenType.EXCLAM_POINT_EQUAL:   30,
         TokenType.TWO_AMPERSANDS:       10,
         TokenType.TWO_VERT_BARS:         5,
+        TokenType.QUESTION_MARK:         3,
         TokenType.EQUAL_SIGN:            1,
     }
 
@@ -95,6 +96,11 @@ class Parser:
             case TokenType.IDENTIFIER:
                 return Var(token.value)
             
+    def parse_conditional_middle(self):
+        self.expect(TokenType.QUESTION_MARK)
+        exp = self.parse_exp(0)
+        self.expect(TokenType.COLON)
+        return exp
            
     def parse_exp(self, min_prec = 0) -> Exp:
         left = self.parse_factor()
@@ -104,6 +110,10 @@ class Parser:
                 self.advance()
                 right = self.parse_exp(self.PRECEDENCE[next_token.token_type])
                 left = Assignment(left, right)
+            elif next_token.token_type == TokenType.QUESTION_MARK:
+                middle = self.parse_conditional_middle()
+                right = self.parse_exp(self.PRECEDENCE[next_token.token_type])
+                left = Conditional(left, middle, right)
             else:
                 operator = self.parse_binop()
                 right = self.parse_exp(self.PRECEDENCE[next_token.token_type] + 1)
@@ -124,13 +134,24 @@ class Parser:
     def parse_statement(self) -> Statement:
         match self.peek().token_type:
             case TokenType.RETURN:
-                self.expect(TokenType.RETURN)
+                self.advance()
                 exp = self.parse_exp()
                 self.expect(TokenType.SEMICOLON)
                 return Return(exp)
             case TokenType.SEMICOLON:
-                self.expect(TokenType.SEMICOLON)
+                self.advance()
                 return Null()
+            case TokenType.IF:
+                self.advance()
+                self.expect(TokenType.OPEN_PAREN)
+                cond = self.parse_exp()
+                self.expect(TokenType.CLOSE_PAREN)
+                then = self.parse_statement()
+                else_ = None
+                if self.peek().token_type == TokenType.ELSE:
+                    self.advance()
+                    else_ = self.parse_statement()
+                return If(cond, then, else_)
             case _:
                 exp = self.parse_exp()
                 self.expect(TokenType.SEMICOLON)

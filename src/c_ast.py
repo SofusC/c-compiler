@@ -39,6 +39,12 @@ class Return(Statement):
 class Expression(Statement):
     exp: Exp
 
+@dataclass
+class If(Statement):
+    condition: Exp
+    then: Statement
+    else_: Statement | None
+
 class Null(Statement):
     pass
 
@@ -70,6 +76,12 @@ class Binary(Exp):
 class Assignment(Exp):
     left: Exp
     right: Exp
+
+@dataclass
+class Conditional(Exp):
+    condition: Exp
+    then_exp: Exp
+    else_exp: Exp
 
 
 

@@ -1,5 +1,4 @@
 int main(void){
-  int var0;
-  var0 = 2;
-  return var0;
+  int a = 0;
+  return a > -1 ? 4 : 5;
 }

@@ -6,6 +6,9 @@ class TokenType(Enum):
     RETURN              = r"return\b"
     VOID                = r"void\b"
     INT                 = r"int\b"
+    IF                  = r"if\b"
+    ELSE                = r"else\b"
+
     CONSTANT            = r"[0-9]+\b"
     IDENTIFIER          = r"[a-zA-Z_]\w*\b"
     OPEN_PAREN          = r"\("
@@ -34,6 +37,9 @@ class TokenType(Enum):
     GREATER_THAN        = r">"
 
     EQUAL_SIGN          = r"="
+
+    QUESTION_MARK       = r"\?"
+    COLON               = r":"
 
     MISMATCH            = r"\S+"
 
