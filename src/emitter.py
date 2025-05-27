@@ -47,7 +47,7 @@ class IREmitter:
             case BinaryOperator.GreaterOrEqual:
                 return IRBinaryOperator.GreaterOrEqual
             case _:
-                raise RuntimeError(f"{ast_node} not implemented")
+                raise RuntimeError(f"Binary {ast_node} not implemented")
 
     def emit_unary_operator(self, ast_node):
         match ast_node:
@@ -58,7 +58,7 @@ class IREmitter:
             case UnaryOperator.Not:
                 return IRUnaryOperator.Not
             case _:
-                raise RuntimeError(f"{ast_node} not implemented")
+                raise RuntimeError(f"Unary {ast_node} not implemented")
     
     def emit_unary_instructions(self, unop, exp, instructions):
         src = self.emit_instructions(exp, instructions)
@@ -84,7 +84,7 @@ class IREmitter:
                             IRLabel(end_label)])
         return dst
 
-    def emit_binary_instructions(self, instructions, binop, e1, e2):
+    def emit_binary_instructions(self, binop, e1, e2, instructions):
         v1 = self.emit_instructions(e1, instructions)
         v2 = self.emit_instructions(e2, instructions)
         dst = IRVar(self.make_temporary())
@@ -101,19 +101,47 @@ class IREmitter:
             case Binary(BinaryOperator.And | BinaryOperator.Or as binop, e1, e2):
                 return self.emit_short_circuit_instructions(binop, e1, e2, instructions)
             case Binary(binop, e1, e2):
-                return self.emit_binary_instructions(instructions, binop, e1, e2)
+                return self.emit_binary_instructions(binop, e1, e2, instructions)
+            case Var(v):
+                return IRVar(v)
+            case Assignment(Var(v), rhs):
+                result = self.emit_instructions(rhs, instructions)
+                lhs = IRVar(v)
+                instructions.append(IRCopy(result, lhs))
+                return lhs
+            case Declaration(name, rhs):
+                result = self.emit_instructions(rhs, instructions)
+                lhs = IRVar(name)
+                instructions.append(IRCopy(result, lhs))
+                return lhs
             case _:
                 raise RuntimeError(f"{ast_node} not implemented")
+            
+    def emit_block_item(self, item, instructions):
+        match item:
+            case Declaration(_, None):
+                pass
+            case Declaration(_, Exp()):
+                self.emit_instructions(item, instructions)
+            case Return(exp):
+                ret = self.emit_instructions(exp, instructions)
+                instructions.append(IRReturn(ret))
+            case Expression(exp):
+                self.emit_instructions(exp, instructions)
+            case Null():
+                pass
+            case _:
+                raise RuntimeError(f"BlockItem {item} not implemented")
 
-    def emit_statement(self, ast_node):
+    def emit_blocks(self, blocks):
         instructions = []
-        assert(isinstance(ast_node, Return))
-        ret = self.emit_instructions(ast_node.exp, instructions)
-        instructions.append(IRReturn(ret))
+        for block in blocks:
+            self.emit_block_item(block, instructions)
+        instructions.append(IRReturn(IRConstant(0)))
         return instructions
     
     def emit_function(self, ast_node):
-        return IRFunctionDefinition(ast_node.name, self.emit_statement(ast_node.body))
+        return IRFunctionDefinition(ast_node.name, self.emit_blocks(ast_node.body))
 
     def emit_program(self, ast_node):
         return IRProgram(self.emit_function(ast_node.function))
