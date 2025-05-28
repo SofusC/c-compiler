@@ -37,8 +37,10 @@ class SemanticAnalyser:
                 return Return(self.resolve_exp(exp))
             case Expression(exp):
                 return Expression(self.resolve_exp(exp))
-            case Null:
-                return Null
+            case If(cond, then, else_):
+                return If(self.resolve_exp(cond), self.resolve_statement(then), self.resolve_statement(else_) if else_ else None)
+            case Null():
+                return Null()
 
     def resolve_exp(self, exp):
         match exp:
@@ -56,6 +58,8 @@ class SemanticAnalyser:
                 return Unary(unop, self.resolve_exp(exp))
             case Binary(binop, left, right):
                 return Binary(binop, self.resolve_exp(left), self.resolve_exp(right))
+            case Conditional(cond, then, else_):
+                return Conditional(self.resolve_exp(cond), self.resolve_exp(then), self.resolve_exp(else_))
 
     def validate_program(self, program):
         new_body = []
