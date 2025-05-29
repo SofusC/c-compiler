@@ -152,6 +152,8 @@ class Parser:
                     self.advance()
                     else_ = self.parse_statement()
                 return If(cond, then, else_)
+            case TokenType.OPEN_BRACE:
+                return self.parse_block()
             case _:
                 exp = self.parse_exp()
                 self.expect(TokenType.SEMICOLON)
@@ -162,6 +164,15 @@ class Parser:
             return self.parse_declaration()
         else:
             return self.parse_statement()
+        
+    def parse_block(self) -> Block:
+        self.expect(TokenType.OPEN_BRACE)
+        block_items = []
+        while self.peek().token_type != TokenType.CLOSE_BRACE:
+            next_block_item = self.parse_block_item()
+            block_items.append(next_block_item)
+        self.expect(TokenType.CLOSE_BRACE)
+        return Block(block_items)
  
     def parse_function_definition(self) -> FunctionDefinition:
         self.expect(TokenType.INT)
@@ -169,14 +180,8 @@ class Parser:
         self.expect(TokenType.OPEN_PAREN)
         self.expect(TokenType.VOID)
         self.expect(TokenType.CLOSE_PAREN)
-        self.expect(TokenType.OPEN_BRACE)
-        function_body = []
-        while self.peek().token_type != TokenType.CLOSE_BRACE:
-            next_block_item = self.parse_block_item()
-            function_body.append(next_block_item)
-        self.expect(TokenType.CLOSE_BRACE)
-        return FunctionDefinition(name, function_body)
-
+        body = self.parse_block()
+        return FunctionDefinition(name, body)
 
     def parse_program(self) -> Program:
         function = self.parse_function_definition()

@@ -16,7 +16,13 @@ class Program(ASTNode):
 @dataclass
 class FunctionDefinition(ASTNode):
     name: str
-    body: List[BlockItem]
+    body: Block
+
+
+
+@dataclass
+class Block(ASTNode):
+    block_items: List[BlockItem]
 
 
 
@@ -44,6 +50,9 @@ class If(Statement):
     condition: Exp
     then: Statement
     else_: Statement | None
+
+class Compound(Statement):
+    block: Block
 
 class Null(Statement):
     pass
