@@ -11,7 +11,7 @@ def indent(text, level):
     return "    " * level + text
 
 def print_list(list, level = 0):
-    lines = [indent("instructions:", level)]
+    lines = [indent("block_items:", level)]
     for elem in list:
         lines.append(print_node(elem, level + 1, True))
     return "\n".join(lines)
@@ -27,7 +27,7 @@ def print_node(node, level = 0, in_list = False):
     class_name = node.__class__.__name__
     values = node.__dict__.values()
 
-    inline = all(is_simple(val) for val in values) or in_list
+    inline = all(is_simple(val) for val in values)# or in_list
     if inline:
         return indent(f"{class_name}(" + ", ".join(print_node(val, 0, True) for val in values) + ")",level)
 

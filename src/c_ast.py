@@ -51,6 +51,7 @@ class If(Statement):
     then: Statement
     else_: Statement | None
 
+@dataclass
 class Compound(Statement):
     block: Block
 

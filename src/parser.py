@@ -5,7 +5,7 @@ from c_ast import *
 
 @dataclass
 class Parser:
-    tokens: List[Token]
+    tokens: List[Token] #TODO: Should probably be a deque
     PRECEDENCE = {
         TokenType.ASTERISK:             50,
         TokenType.FORWARD_SLASH:        50,
@@ -153,7 +153,7 @@ class Parser:
                     else_ = self.parse_statement()
                 return If(cond, then, else_)
             case TokenType.OPEN_BRACE:
-                return self.parse_block()
+                return Compound(self.parse_block())
             case _:
                 exp = self.parse_exp()
                 self.expect(TokenType.SEMICOLON)
