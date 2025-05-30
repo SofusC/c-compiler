@@ -190,6 +190,8 @@ class IREmitter:
                 self.emit_exp(exp)
             case If(cond, then, else_):
                 self.emit_if(cond, then, else_)
+            case Compound(block):
+                self.emit_block(block)
             case Null():
                 pass
             case _:
@@ -204,14 +206,15 @@ class IREmitter:
             case _:
                 raise RuntimeError(f"BlockItem {item} not implemented")
 
-    def emit_blocks(self, blocks):
-        for block in blocks:
-            self.emit_block_item(block)
-        self.instructions.append(IRReturn(IRConstant(0)))
+    def emit_block(self, block):
+        for block_item in block.block_items:
+            self.emit_block_item(block_item)
         return self.instructions
     
     def emit_function(self, ast_node):
-        return IRFunctionDefinition(ast_node.name, self.emit_blocks(ast_node.body))
-
+        instructions = self.emit_block(ast_node.body)
+        instructions.append(IRReturn(IRConstant(0)))
+        return IRFunctionDefinition(ast_node.name, instructions)
+    
     def emit_program(self, ast_node):
         return IRProgram(self.emit_function(ast_node.function))
