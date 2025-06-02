@@ -8,6 +8,11 @@ class TokenType(Enum):
     INT                 = r"int\b"
     IF                  = r"if\b"
     ELSE                = r"else\b"
+    DO                  = r"do\b"
+    WHILE               = r"while\b"
+    FOR                 = r"for\b"
+    BREAK               = r"break\b"
+    CONTINUE            = r"continue\b"
 
     CONSTANT            = r"[0-9]+\b"
     IDENTIFIER          = r"[a-zA-Z_]\w*\b"

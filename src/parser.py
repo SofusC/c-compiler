@@ -36,9 +36,10 @@ class Parser:
     def expect(self, expected) -> Token:
         if not isinstance(expected, Iterable):
             expected = [expected]
-        token = self.advance()
+        token = self.peek()
         if token.token_type not in expected:
             raise RuntimeError(f"Expected '{expected}' but found '{token.token_type}' with {len(self.tokens)} tokens left")
+        token = self.advance()
         return token
     
     def parse_binop(self) -> BinaryOperator:
@@ -130,6 +131,21 @@ class Parser:
             init = self.parse_exp()
         self.expect(TokenType.SEMICOLON)
         return Declaration(name, init)
+    
+    def parse_optional_exp(self, end_symbol) -> Exp | None:
+        if self.peek().token_type != end_symbol:
+            exp = self.parse_exp()
+            return exp
+        return None
+    
+    def parse_for_init(self):
+        try:
+            decl = self.parse_declaration()
+            return InitDecl(decl)
+        except:
+            exp = self.parse_optional_exp(TokenType.SEMICOLON)
+            self.expect(TokenType.SEMICOLON)
+            return InitExp(exp)
 
     def parse_statement(self) -> Statement:
         match self.peek().token_type:
@@ -154,6 +170,40 @@ class Parser:
                 return If(cond, then, else_)
             case TokenType.OPEN_BRACE:
                 return Compound(self.parse_block())
+            case TokenType.BREAK:
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                return Break()
+            case TokenType.CONTINUE:
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                return Continue()
+            case TokenType.WHILE:
+                self.advance()
+                self.expect(TokenType.OPEN_PAREN)
+                cond = self.parse_exp()
+                self.expect(TokenType.CLOSE_PAREN)
+                body = self.parse_statement()
+                return While(cond, body)
+            case TokenType.DO:
+                self.advance()
+                body = self.parse_statement()
+                self.expect(TokenType.WHILE)
+                self.expect(TokenType.OPEN_PAREN)
+                cond = self.parse_exp()
+                self.expect(TokenType.CLOSE_PAREN)
+                self.expect(TokenType.SEMICOLON)
+                return DoWhile(body, cond)
+            case TokenType.FOR:
+                self.advance()
+                self.expect(TokenType.OPEN_PAREN)
+                for_init = self.parse_for_init()
+                cond = self.parse_optional_exp(TokenType.SEMICOLON)
+                self.expect(TokenType.SEMICOLON)
+                post = self.parse_optional_exp(TokenType.CLOSE_PAREN)
+                self.expect(TokenType.CLOSE_PAREN)
+                body = self.parse_statement()
+                return For(for_init, cond, post, body)
             case _:
                 exp = self.parse_exp()
                 self.expect(TokenType.SEMICOLON)

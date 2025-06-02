@@ -26,6 +26,19 @@ class Block(ASTNode):
 
 
 
+class ForInit(ASTNode):
+    pass
+
+@dataclass
+class InitDecl(ForInit):
+    declaration: Declaration
+
+@dataclass
+class InitExp(ForInit):
+    exp: Exp | None = None
+
+
+
 class BlockItem(ASTNode):
     pass
 
@@ -55,6 +68,34 @@ class If(Statement):
 class Compound(Statement):
     block: Block
 
+@dataclass
+class Break(Statement):
+    label: str | None = None
+
+@dataclass
+class Continue(Statement):
+    label: str | None = None
+
+@dataclass
+class While(Statement):
+    condition: Exp
+    body: Statement
+    label: str | None = None
+
+@dataclass
+class DoWhile(Statement):
+    body: Statement
+    condition: Exp
+    label: str | None = None
+    
+@dataclass
+class For(Statement):
+    init: ForInit
+    condition: Exp | None
+    post: Exp | None
+    body: Statement
+    label: str | None = None
+    
 class Null(Statement):
     pass
 
