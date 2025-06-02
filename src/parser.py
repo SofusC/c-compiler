@@ -23,6 +23,26 @@ class Parser:
         TokenType.QUESTION_MARK:         3,
         TokenType.EQUAL_SIGN:            1,
     }
+    binop_map = {
+        TokenType.ASTERISK:           BinaryOperator.Multiply,
+        TokenType.FORWARD_SLASH:      BinaryOperator.Divide,
+        TokenType.PERCENT_SIGN:       BinaryOperator.Remainder,
+        TokenType.PLUS:               BinaryOperator.Add,
+        TokenType.HYPHEN:             BinaryOperator.Subtract,
+        TokenType.TWO_AMPERSANDS:     BinaryOperator.And,
+        TokenType.TWO_VERT_BARS:      BinaryOperator.Or,
+        TokenType.TWO_EQUAL_SIGNS:    BinaryOperator.Equal,
+        TokenType.EXCLAM_POINT_EQUAL: BinaryOperator.NotEqual,
+        TokenType.LESS_THAN:          BinaryOperator.LessThan,
+        TokenType.LESS_THAN_OR_EQ:    BinaryOperator.LessOrEqual,
+        TokenType.GREATER_THAN:       BinaryOperator.GreaterThan,
+        TokenType.GREATER_THAN_OR_EQ: BinaryOperator.GreaterOrEqual,
+    }
+    unop_map = {
+        TokenType.TILDE:             UnaryOperator.Complement,
+        TokenType.HYPHEN:            UnaryOperator.Negate,
+        TokenType.EXCLAMATION_POINT: UnaryOperator.Not,
+    }
 
     def is_binary(self, token) -> bool:
         return token.token_type in self.PRECEDENCE.keys()
@@ -43,36 +63,9 @@ class Parser:
         return token
     
     def parse_binop(self) -> BinaryOperator:
-        token = self.expect(self.PRECEDENCE.keys())
-        match token.token_type:
-            case TokenType.ASTERISK:
-                return BinaryOperator.Multiply
-            case TokenType.FORWARD_SLASH:
-                return BinaryOperator.Divide
-            case TokenType.PERCENT_SIGN:
-                return BinaryOperator.Remainder
-            case TokenType.PLUS:
-                return BinaryOperator.Add
-            case TokenType.HYPHEN:
-                return BinaryOperator.Subtract
-            case TokenType.TWO_AMPERSANDS:
-                return BinaryOperator.And
-            case TokenType.TWO_VERT_BARS:
-                return BinaryOperator.Or
-            case TokenType.TWO_EQUAL_SIGNS:
-                return BinaryOperator.Equal
-            case TokenType.EXCLAM_POINT_EQUAL:
-                return BinaryOperator.NotEqual
-            case TokenType.LESS_THAN:
-                return BinaryOperator.LessThan
-            case TokenType.LESS_THAN_OR_EQ:
-                return BinaryOperator.LessOrEqual
-            case TokenType.GREATER_THAN:
-                return BinaryOperator.GreaterThan
-            case TokenType.GREATER_THAN_OR_EQ:
-                return BinaryOperator.GreaterOrEqual
+        token = self.expect(self.binop_map.keys())
+        return self.binop_map[token.token_type]
             
-
     def parse_factor(self) -> Exp:
         token = self.expect([
             TokenType.CONSTANT, 
@@ -84,12 +77,8 @@ class Parser:
         match token.token_type:
             case TokenType.CONSTANT:
                 return Constant(token.value)
-            case TokenType.TILDE:
-                return Unary(UnaryOperator.Complement, self.parse_factor())
-            case TokenType.HYPHEN:
-                return Unary(UnaryOperator.Negate, self.parse_factor())
-            case TokenType.EXCLAMATION_POINT:
-                return Unary(UnaryOperator.Not, self.parse_factor())
+            case TokenType.TILDE | TokenType.HYPHEN | TokenType.EXCLAMATION_POINT as unop:
+                return Unary(self.unop_map[unop], self.parse_factor())
             case TokenType.OPEN_PAREN:
                 exp = self.parse_exp()
                 self.expect(TokenType.CLOSE_PAREN)
@@ -146,6 +135,47 @@ class Parser:
             exp = self.parse_optional_exp(TokenType.SEMICOLON)
             self.expect(TokenType.SEMICOLON)
             return InitExp(exp)
+    
+    def parse_while(self):
+        self.expect(TokenType.WHILE)
+        self.expect(TokenType.OPEN_PAREN)
+        cond = self.parse_exp()
+        self.expect(TokenType.CLOSE_PAREN)
+        body = self.parse_statement()
+        return While(cond, body)
+    
+    def parse_dowhile(self):
+        self.expect(TokenType.DO)
+        body = self.parse_statement()
+        self.expect(TokenType.WHILE)
+        self.expect(TokenType.OPEN_PAREN)
+        cond = self.parse_exp()
+        self.expect(TokenType.CLOSE_PAREN)
+        self.expect(TokenType.SEMICOLON)
+        return DoWhile(body, cond)
+    
+    def parse_for(self):
+        self.expect(TokenType.FOR)
+        self.expect(TokenType.OPEN_PAREN)
+        for_init = self.parse_for_init()
+        cond = self.parse_optional_exp(TokenType.SEMICOLON)
+        self.expect(TokenType.SEMICOLON)
+        post = self.parse_optional_exp(TokenType.CLOSE_PAREN)
+        self.expect(TokenType.CLOSE_PAREN)
+        body = self.parse_statement()
+        return For(for_init, cond, post, body)
+    
+    def parse_if(self):
+        self.expect(TokenType.IF)
+        self.expect(TokenType.OPEN_PAREN)
+        cond = self.parse_exp()
+        self.expect(TokenType.CLOSE_PAREN)
+        then = self.parse_statement()
+        else_ = None
+        if self.peek().token_type == TokenType.ELSE:
+            self.advance()
+            else_ = self.parse_statement()
+        return If(cond, then, else_)
 
     def parse_statement(self) -> Statement:
         match self.peek().token_type:
@@ -158,16 +188,7 @@ class Parser:
                 self.advance()
                 return Null()
             case TokenType.IF:
-                self.advance()
-                self.expect(TokenType.OPEN_PAREN)
-                cond = self.parse_exp()
-                self.expect(TokenType.CLOSE_PAREN)
-                then = self.parse_statement()
-                else_ = None
-                if self.peek().token_type == TokenType.ELSE:
-                    self.advance()
-                    else_ = self.parse_statement()
-                return If(cond, then, else_)
+                return self.parse_if()
             case TokenType.OPEN_BRACE:
                 return Compound(self.parse_block())
             case TokenType.BREAK:
@@ -179,31 +200,11 @@ class Parser:
                 self.expect(TokenType.SEMICOLON)
                 return Continue()
             case TokenType.WHILE:
-                self.advance()
-                self.expect(TokenType.OPEN_PAREN)
-                cond = self.parse_exp()
-                self.expect(TokenType.CLOSE_PAREN)
-                body = self.parse_statement()
-                return While(cond, body)
+                return self.parse_while()
             case TokenType.DO:
-                self.advance()
-                body = self.parse_statement()
-                self.expect(TokenType.WHILE)
-                self.expect(TokenType.OPEN_PAREN)
-                cond = self.parse_exp()
-                self.expect(TokenType.CLOSE_PAREN)
-                self.expect(TokenType.SEMICOLON)
-                return DoWhile(body, cond)
+                return self.parse_dowhile()
             case TokenType.FOR:
-                self.advance()
-                self.expect(TokenType.OPEN_PAREN)
-                for_init = self.parse_for_init()
-                cond = self.parse_optional_exp(TokenType.SEMICOLON)
-                self.expect(TokenType.SEMICOLON)
-                post = self.parse_optional_exp(TokenType.CLOSE_PAREN)
-                self.expect(TokenType.CLOSE_PAREN)
-                body = self.parse_statement()
-                return For(for_init, cond, post, body)
+                return self.parse_for()
             case _:
                 exp = self.parse_exp()
                 self.expect(TokenType.SEMICOLON)
