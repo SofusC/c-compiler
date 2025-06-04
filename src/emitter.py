@@ -167,7 +167,63 @@ class IREmitter:
             self.instructions.append(IRLabel(else_label))
             self.emit_block_item(else_)
 
-        self.instructions.append(IRLabel(end_label))     
+        self.instructions.append(IRLabel(end_label))  
+
+    def emit_for_init(self, for_init):
+        match for_init:
+            case InitDecl(decl):
+                return self.emit_declaration(decl)
+            case InitExp(None):
+                pass
+            case InitExp(exp):
+                return self.emit_exp(exp)
+            case _:
+                raise RuntimeError(f"ForInit {for_init} not implemented")
+    
+    def emit_conditional_jump(self, cond, jump_label, invert=False):
+        result = self.emit_exp(cond)
+        v = IRVar(self.make_temporary())
+        self.instructions.append(IRCopy(result, v))
+        if invert:
+            self.instructions.append(IRJumpIfNotZero(v, jump_label))
+        else:
+            self.instructions.append(IRJumpIfZero(v, jump_label))
+
+    def make_loop_labels(self, label):
+        return (
+            IRLabel(f"start_{label}"),
+            IRLabel(f"continue_{label}"),
+            IRLabel(f"break_{label}")
+        )
+
+    def emit_loop(self, loop):
+        match loop:
+            case While(cond, body, label):
+                _, continue_, break_ = self.make_loop_labels(label)
+                self.instructions.append(continue_)
+                self.emit_conditional_jump(cond, f"break_{label}")
+                self.emit_statement(body)
+                self.instructions.append(IRJump(f"continue_{label}"))
+                self.instructions.append(break_)
+            case DoWhile(body, cond, label):
+                start, continue_, break_ = self.make_loop_labels(label)
+                self.instructions.append(start)
+                self.emit_statement(body)
+                self.instructions.append(continue_)
+                self.emit_conditional_jump(cond, f"start_{label}", True)
+                self.instructions.append(break_)
+            case For(init, cond, post, body, label):
+                start, continue_, break_ = self.make_loop_labels(label)
+                self.emit_for_init(init)
+                self.instructions.append(start)
+                if cond is not None:
+                    self.emit_conditional_jump(cond, f"break_{label}")
+                self.emit_statement(body)
+                self.instructions.append(continue_)
+                if post is not None:
+                    self.emit_exp(post)
+                self.instructions.append(IRJump(f"start_{label}"))
+                self.instructions.append(break_)
 
     def emit_declaration(self, decl):
         match decl:
@@ -192,6 +248,12 @@ class IREmitter:
                 self.emit_if(cond, then, else_)
             case Compound(block):
                 self.emit_block(block)
+            case Break(label):
+                self.instructions.append(IRJump(f"break_{label}"))
+            case Continue(label):
+                self.instructions.append(IRJump(f"continue_{label}"))
+            case While() | DoWhile() | For():
+                self.emit_loop(statement)
             case Null():
                 pass
             case _:
