@@ -50,10 +50,12 @@ class SemanticAnalyser:
     
     def resolve_for_init(self, init, variable_map):
         match init:
-            case InitExp(exp):
-                return InitExp(self.resolve_exp(exp, variable_map))
             case InitDecl(decl):
                 return InitDecl(self.resolve_declaration(decl, variable_map))
+            case InitExp(None):
+                return InitExp(None)
+            case InitExp(exp):
+                return InitExp(self.resolve_exp(exp, variable_map))
 
     def resolve_statement(self, statement, variable_map):
         match statement:
@@ -62,7 +64,9 @@ class SemanticAnalyser:
             case Expression(exp):
                 return Expression(self.resolve_exp(exp, variable_map))
             case If(cond, then, else_):
-                return If(self.resolve_exp(cond, variable_map), self.resolve_statement(then, variable_map), self.resolve_statement(else_, variable_map) if else_ else None)
+                return If(self.resolve_exp(cond, variable_map), 
+                          self.resolve_statement(then, variable_map), 
+                          self.resolve_statement(else_, variable_map) if else_ else None)
             case Compound(block):
                 new_variable_map = self.copy_variable_map(variable_map)
                 return Compound(self.resolve_block(block, new_variable_map))
@@ -77,8 +81,8 @@ class SemanticAnalyser:
             case For(init, cond, post, body):
                 new_variable_map = self.copy_variable_map(variable_map)
                 init = self.resolve_for_init(init, new_variable_map)
-                cond = self.resolve_exp(cond, new_variable_map)
-                post = self.resolve_exp(post, new_variable_map)
+                cond = self.resolve_exp(cond, new_variable_map) if cond else None
+                post = self.resolve_exp(post, new_variable_map) if post else None
                 body = self.resolve_statement(body, new_variable_map)
                 return For(init, cond, post, body)
             case Null():
@@ -103,9 +107,9 @@ class SemanticAnalyser:
             case Binary(binop, left, right):
                 return Binary(binop, self.resolve_exp(left, variable_map), self.resolve_exp(right, variable_map))
             case Conditional(cond, then, else_):
-                return Conditional(self.resolve_exp(cond, variable_map), self.resolve_exp(then, variable_map), self.resolve_exp(else_, variable_map))
-            case None:
-                return None
+                return Conditional(self.resolve_exp(cond, variable_map), 
+                                   self.resolve_exp(then, variable_map), 
+                                   self.resolve_exp(else_, variable_map))
             case _:
                 raise RuntimeError(f"Could not validate semantics for expression {exp}")
     
@@ -121,32 +125,36 @@ class SemanticAnalyser:
             new_block_items.append(item)
         return Block(new_block_items)
     
+    def ensure_label(self, current_label, kind):
+        if current_label is None:
+            raise RuntimeError(f"{kind} statement outside loop")
+        return current_label
+    
+    def label_loop(self, loop):
+        new_label = self.make_label("loop")
+        labeled_body = self.label_statement(loop.body, new_label)
+        match loop:
+            case While(cond, _):
+                return While(cond, labeled_body, new_label)
+            case DoWhile(_, cond):
+                return DoWhile(labeled_body, cond, new_label)
+            case For(init, cond, post, _):
+                return For(init, cond, post, labeled_body, new_label)
+    
     def label_statement(self, statement, current_label = None):
         match statement:
             case Break():
-                if current_label is None:
-                    raise RuntimeError("Break statement outside loop")
-                return Break(current_label)
+                return Break(self.ensure_label(current_label, "Break"))
             case Continue():
-                if current_label is None:
-                    raise RuntimeError("Continue statement outside loop")
-                return Continue(current_label)
+                return Continue(self.ensure_label(current_label, "Continue"))
             case If(cond, then, else_):
-                return If(cond, self.label_statement(then, current_label), self.label_statement(else_, current_label) if else_ else None)
+                return If(cond, 
+                          self.label_statement(then, current_label), 
+                          self.label_statement(else_, current_label) if else_ else None)
             case Compound(block):
                 return Compound(self.label_block(block, current_label))
-            case While(cond, body):
-                new_label = self.make_label("loop")
-                labeled_body = self.label_statement(body, new_label)
-                return While(cond, labeled_body, new_label)
-            case DoWhile(body, cond):
-                new_label = self.make_label("loop")
-                labeled_body = self.label_statement(body, new_label)
-                return DoWhile(labeled_body, cond, new_label)
-            case For(init, cond, post, body):
-                new_label = self.make_label("loop")
-                labeled_body = self.label_statement(body, new_label)
-                return For(init, cond, post, labeled_body, new_label)
+            case While() | DoWhile() | For() as loop:
+                return self.label_loop(loop)
             case _:
                 return statement
     
