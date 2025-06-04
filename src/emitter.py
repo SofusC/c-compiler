@@ -1,10 +1,9 @@
 from ir_ast import *
 from c_ast import *
-from semantic_analyser import SharedCounter
+from semantic_analyser import NameGenerator
 
 class IREmitter:
     instructions = []
-    label_counter = 0
 
     unop_map = {
         UnaryOperator.Complement     : IRUnaryOperator.Complement,
@@ -24,17 +23,6 @@ class IREmitter:
         BinaryOperator.GreaterThan   : IRBinaryOperator.GreaterThan,
         BinaryOperator.GreaterOrEqual: IRBinaryOperator.GreaterOrEqual,
     }
-
-    def make_temporary(self):
-        register_name = f"tmp.{SharedCounter.get_value()}"
-        SharedCounter.increment()
-        return register_name
-    
-    def make_label(self, label_name):
-        label_name += str(self.label_counter)
-        self.label_counter += 1
-        return label_name
-
     
     def emit_binary_operator(self, ast_node):
         try:
@@ -50,7 +38,7 @@ class IREmitter:
     
     def emit_unary_instructions(self, unop, exp):
         src = self.emit_exp(exp)
-        dst = IRVar(self.make_temporary())
+        dst = IRVar(NameGenerator.make_temporary())
         tacky_op = self.emit_unary_operator(unop)
         self.instructions.append(IRUnary(tacky_op,src,dst))
         return dst
@@ -65,7 +53,7 @@ class IREmitter:
 
         # Evaluate first expression
         val1 = self.emit_exp(e1)
-        sc_label = self.make_label(f"sc_{binop.name.lower()}")
+        sc_label = NameGenerator.make_label(f"sc_{binop.name.lower()}")
         self.instructions.append(jump_instr(val1, sc_label))
 
         # Evaluate second expression only if needed
@@ -73,8 +61,8 @@ class IREmitter:
         self.instructions.append(jump_instr(val2, sc_label))
 
         # Compute the result
-        result = IRVar(self.make_temporary())
-        end_label = self.make_label("end_sc")
+        result = IRVar(NameGenerator.make_temporary())
+        end_label = NameGenerator.make_label("end_sc")
 
         self.instructions.extend([
             IRCopy(IRConstant(1 - short_circuit_value), result),
@@ -89,7 +77,7 @@ class IREmitter:
     def emit_binary_instructions(self, binop, e1, e2):
         v1 = self.emit_exp(e1)
         v2 = self.emit_exp(e2)
-        dst = IRVar(self.make_temporary())
+        dst = IRVar(NameGenerator.make_temporary())
         tacky_op = self.emit_binary_operator(binop)
         self.instructions.append(IRBinary(tacky_op, v1, v2, dst))
         return dst
@@ -119,20 +107,20 @@ class IREmitter:
     def emit_conditional(self, cond, then, else_):
         # Evaluate condition
         cond_val = self.emit_exp(cond)
-        cond_tmp = IRVar(self.make_temporary())
+        cond_tmp = IRVar(NameGenerator.make_temporary())
         self.instructions.append(IRCopy(cond_val, cond_tmp))
 
-        result = IRVar(self.make_temporary())
+        result = IRVar(NameGenerator.make_temporary())
 
-        else_label = self.make_label("else")
-        end_label = self.make_label("end")
+        else_label = NameGenerator.make_label("else")
+        end_label = NameGenerator.make_label("end")
 
         # Conditional jump to else
         self.instructions.append(IRJumpIfZero(cond_tmp, else_label))
 
         # Then branch
         then_val = self.emit_exp(then)
-        then_tmp = IRVar(self.make_temporary())
+        then_tmp = IRVar(NameGenerator.make_temporary())
         self.instructions.append(IRCopy(then_val, then_tmp))
         self.instructions.append(IRCopy(then_tmp, result))
         self.instructions.append(IRJump(end_label))
@@ -140,7 +128,7 @@ class IREmitter:
         # Else branch
         self.instructions.append(IRLabel(else_label))
         else_val = self.emit_exp(else_)
-        else_tmp = IRVar(self.make_temporary())
+        else_tmp = IRVar(NameGenerator.make_temporary())
         self.instructions.append(IRCopy(else_val, else_tmp))
         self.instructions.append(IRCopy(else_tmp, result))
 
@@ -150,17 +138,17 @@ class IREmitter:
     def emit_if(self, cond, then, else_):
         # Evaluate condition
         cond_val = self.emit_exp(cond)
-        cond_tmp = IRVar(self.make_temporary())
+        cond_tmp = IRVar(NameGenerator.make_temporary())
         self.instructions.append(IRCopy(cond_val, cond_tmp))
 
-        end_label = self.make_label("end")
+        end_label = NameGenerator.make_label("end")
 
         if else_ is None:
             self.instructions.append(IRJumpIfZero(cond_tmp, end_label))
             self.emit_block_item(then)
         else:
             # With else branch
-            else_label = self.make_label("else")
+            else_label = NameGenerator.make_label("else")
             self.instructions.append(IRJumpIfZero(cond_tmp, else_label))
             self.emit_block_item(then)
             self.instructions.append(IRJump(end_label))
@@ -182,7 +170,7 @@ class IREmitter:
     
     def emit_conditional_jump(self, cond, jump_label, invert=False):
         result = self.emit_exp(cond)
-        v = IRVar(self.make_temporary())
+        v = IRVar(NameGenerator.make_temporary())
         self.instructions.append(IRCopy(result, v))
         if invert:
             self.instructions.append(IRJumpIfNotZero(v, jump_label))

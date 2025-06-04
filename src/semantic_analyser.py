@@ -1,37 +1,29 @@
 from c_ast import *
 from typing import NamedTuple
 import copy
-
-class SharedCounter:
-    counter = 0
-
-    @classmethod
-    def increment(cls):
-        cls.counter += 1
-        return cls.counter
+class NameGenerator:
+    _counter = 0
 
     @classmethod
-    def get_value(cls):
-        return cls.counter
+    def _next_id(cls):
+        val = cls._counter
+        cls._counter += 1
+        return val
     
+    @classmethod
+    def make_temporary(cls, name = "tmp"):
+        unique_name = f"{name}.{cls._next_id()}"
+        return unique_name
+    
+    @classmethod
+    def make_label(cls, label_name):
+        return f"{label_name}{cls._next_id()}"
 
 class MapEntry(NamedTuple):
     name: str
     from_current_block: bool
 
 class SemanticAnalyser:
-    label_counter = 0
-
-    def make_temporary(self, name):
-        unique_name = f"{name}.{SharedCounter.get_value()}"
-        SharedCounter.increment()
-        return unique_name
-    
-    def make_label(self, label_name): #TODO: this is identical to method in emitter, shared util class instead of counter?
-        label_name += str(self.label_counter)
-        self.label_counter += 1
-        return label_name
-    
     def copy_variable_map(self, variable_map):
         result = copy.deepcopy(variable_map)
         result = {k: MapEntry(v.name, False) for k, v in result.items()}
@@ -41,7 +33,7 @@ class SemanticAnalyser:
         name = decl.name
         if name in variable_map and variable_map[name].from_current_block:
             raise RuntimeError("Duplicate variable declaration")
-        unique_name = self.make_temporary(name)
+        unique_name = NameGenerator.make_temporary(name)
         variable_map[name] = MapEntry(unique_name, True)
         init = decl.init
         if init is not None:
@@ -131,7 +123,7 @@ class SemanticAnalyser:
         return current_label
     
     def label_loop(self, loop):
-        new_label = self.make_label("loop")
+        new_label = NameGenerator.make_label("loop")
         labeled_body = self.label_statement(loop.body, new_label)
         match loop:
             case While(cond, _):
