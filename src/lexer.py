@@ -46,6 +46,8 @@ class TokenType(Enum):
     QUESTION_MARK       = r"\?"
     COLON               = r":"
 
+    COMMA               = r","
+
     MISMATCH            = r"\S+"
 
 

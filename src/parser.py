@@ -65,6 +65,16 @@ class Parser:
     def parse_binop(self) -> BinaryOperator:
         token = self.expect(self.binop_map.keys())
         return self.binop_map[token.token_type]
+    
+    def parse_argument_list(self) -> List[Exp]:
+        args = []
+        if self.peek().token_type != TokenType.CLOSE_PAREN:
+            while True:
+                args.append(self.parse_exp())
+                if self.peek().token_type != TokenType.COMMA:
+                    break
+                self.expect(TokenType.COMMA)
+        return args
             
     def parse_factor(self) -> Exp:
         token = self.expect([
@@ -83,6 +93,11 @@ class Parser:
                 exp = self.parse_exp()
                 self.expect(TokenType.CLOSE_PAREN)
                 return exp
+            case TokenType.IDENTIFIER if self.peek().token_type == TokenType.OPEN_PAREN:
+                self.advance()
+                args = self.parse_argument_list()
+                self.expect(TokenType.CLOSE_PAREN)
+                return FunctionCall(token.value, args)
             case TokenType.IDENTIFIER:
                 return Var(token.value)
             
@@ -111,16 +126,6 @@ class Parser:
             next_token = self.peek()
         return left
     
-    def parse_declaration(self) -> Declaration:
-        self.expect(TokenType.INT)
-        name = self.expect(TokenType.IDENTIFIER).value
-        init = None
-        if self.peek().token_type == TokenType.EQUAL_SIGN:
-            self.advance()
-            init = self.parse_exp()
-        self.expect(TokenType.SEMICOLON)
-        return Declaration(name, init)
-    
     def parse_optional_exp(self, end_symbol) -> Exp | None:
         if self.peek().token_type != end_symbol:
             exp = self.parse_exp()
@@ -128,10 +133,10 @@ class Parser:
         return None
     
     def parse_for_init(self):
-        try:
-            decl = self.parse_declaration()
+        if self.peek().token_type == TokenType.INT:
+            decl = self.parse_variable_declaration()
             return InitDecl(decl)
-        except:
+        else:
             exp = self.parse_optional_exp(TokenType.SEMICOLON)
             self.expect(TokenType.SEMICOLON)
             return InitExp(exp)
@@ -211,10 +216,10 @@ class Parser:
                 return Expression(exp)
     
     def parse_block_item(self) -> BlockItem:
-        if self.peek().token_type == TokenType.INT:
-            return self.parse_declaration()
+        if self.peek().token_type == TokenType.INT: # TODO: New AST
+            return D(self.parse_declaration())
         else:
-            return self.parse_statement()
+            return S(self.parse_statement())
         
     def parse_block(self) -> Block:
         self.expect(TokenType.OPEN_BRACE)
@@ -224,19 +229,54 @@ class Parser:
             block_items.append(next_block_item)
         self.expect(TokenType.CLOSE_BRACE)
         return Block(block_items)
+    
+    def parse_param_list(self) -> List[str]:
+        params = []
+        if self.peek().token_type == TokenType.VOID:
+            self.advance()
+            return params
+        self.expect(TokenType.INT)
+        params.append(self.expect(TokenType.IDENTIFIER).value)
+        while self.peek().token_type != TokenType.CLOSE_PAREN:
+            self.expect(TokenType.COMMA)
+            self.expect(TokenType.INT)
+            params.append(self.expect(TokenType.IDENTIFIER).value)
+        return params
+    
+    def parse_variable_declaration(self) -> VariableDeclaration:
+        self.expect(TokenType.INT)
+        name = self.expect(TokenType.IDENTIFIER).value
+        init = None
+        if self.peek().token_type == TokenType.EQUAL_SIGN:
+            self.advance()
+            init = self.parse_exp()
+        self.expect(TokenType.SEMICOLON)
+        return VariableDeclaration(name, init)
  
-    def parse_function_definition(self) -> FunctionDefinition:
+    def parse_function_declaration(self) -> FunctionDeclaration:
         self.expect(TokenType.INT)
         name = self.expect(TokenType.IDENTIFIER).value
         self.expect(TokenType.OPEN_PAREN)
-        self.expect(TokenType.VOID)
+        params = self.parse_param_list()
         self.expect(TokenType.CLOSE_PAREN)
-        body = self.parse_block()
-        return FunctionDefinition(name, body)
+        body = None
+        if self.peek().token_type == TokenType.OPEN_BRACE:
+            body = self.parse_block()
+        else:
+            self.expect(TokenType.SEMICOLON)
+        return FunctionDeclaration(name, params, body)
+    
+    def parse_declaration(self) -> Declaration:
+        if self.tokens[2].token_type == TokenType.OPEN_PAREN:
+            return FunDecl(self.parse_function_declaration())
+        else:
+            return VarDecl(self.parse_variable_declaration())
 
     def parse_program(self) -> Program:
-        function = self.parse_function_definition()
-        program = Program(function)
+        functions = []
+        while len(self.tokens) != 0:
+            functions.append(self.parse_function_declaration())
+        program = Program(functions)
         if len(self.tokens) != 0:
             raise RuntimeError(f"Syntax error, tokens left: {[token for token in self.tokens]}")
         return program

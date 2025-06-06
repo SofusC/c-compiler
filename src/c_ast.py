@@ -11,12 +11,33 @@ class ASTNode(ABC):
 
 @dataclass
 class Program(ASTNode):
-    function: FunctionDefinition
+    function_declarations: List[FunctionDeclaration]
+
+
+
+class Declaration(ASTNode):
+    pass
 
 @dataclass
-class FunctionDefinition(ASTNode):
+class FunDecl(Declaration):
+    function_declaration: FunctionDeclaration
+
+@dataclass
+class VarDecl(Declaration):
+    variable_declaration: VariableDeclaration
+
+
+
+@dataclass
+class VariableDeclaration(ASTNode):
     name: str
-    body: Block
+    init: Exp | None
+
+@dataclass
+class FunctionDeclaration(ASTNode):
+    name: str
+    params: List[str]
+    body: Block | None
 
 
 
@@ -31,7 +52,7 @@ class ForInit(ASTNode):
 
 @dataclass
 class InitDecl(ForInit):
-    declaration: Declaration
+    declaration: VariableDeclaration
 
 @dataclass
 class InitExp(ForInit):
@@ -43,9 +64,14 @@ class BlockItem(ASTNode):
     pass
 
 @dataclass
-class Declaration(BlockItem):
-    name: str
-    init: Exp | None
+class D(BlockItem):
+    declaration: Declaration
+
+@dataclass
+class S(BlockItem):
+    statement: Statement
+
+
 
 class Statement(BlockItem):
     pass
@@ -133,6 +159,11 @@ class Conditional(Exp):
     condition: Exp
     then_exp: Exp
     else_exp: Exp
+
+@dataclass
+class FunctionCall(Exp):
+    identifier: str
+    args: List[Exp]
 
 
 
