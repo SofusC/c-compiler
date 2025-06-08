@@ -216,7 +216,7 @@ class Parser:
                 return Expression(exp)
     
     def parse_block_item(self) -> BlockItem:
-        if self.peek().token_type == TokenType.INT: # TODO: New AST
+        if self.peek().token_type == TokenType.INT:
             return D(self.parse_declaration())
         else:
             return S(self.parse_statement())
