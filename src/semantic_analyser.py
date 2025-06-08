@@ -1,33 +1,27 @@
 from c_ast import *
 from typing import NamedTuple
 import copy
-class NameGenerator:
-    _counter = 0
 
-    @classmethod
-    def _next_id(cls):
-        val = cls._counter
-        cls._counter += 1
-        return val
-    
-    @classmethod
-    def make_temporary(cls, name = "tmp"):
-        unique_name = f"{name}.{cls._next_id()}"
-        return unique_name
-    
-    @classmethod
-    def make_label(cls, label_name):
-        return f"{label_name}{cls._next_id()}"
+def validate_program(program):
+    identifier_map: dict[str, VariableResolver.MapEntry] = {}
+    resolver = VariableResolver()
+    labeller = LoopLabeller()
+    new_function_decls = []
+    for function_decl in program.function_declarations:
+        resolved = resolver.resolve_function_declaration(function_decl, identifier_map)
+        labelled = labeller.label_function_declaration(resolved)
+        new_function_decls.append(labelled)
+    return Program(new_function_decls)
 
-class MapEntry(NamedTuple):
-    name: str
-    from_current_scope: bool
-    has_linkage: bool
+class VariableResolver:
+    class MapEntry(NamedTuple):
+        name: str
+        from_current_scope: bool
+        has_linkage: bool
 
-class SemanticAnalyser:
     def copy_identifier_map(self, identifier_map):
         result = copy.deepcopy(identifier_map)
-        result = {k: MapEntry(v.name, False, v.has_linkage) for k, v in result.items()}
+        result = {k: self.MapEntry(v.name, False, v.has_linkage) for k, v in result.items()}
         return result
     
     def resolve_for_init(self, init, identifier_map):
@@ -118,7 +112,7 @@ class SemanticAnalyser:
         if name in identifier_map and identifier_map[name].from_current_scope:
             raise RuntimeError("Duplicate variable declaration")
         unique_name = NameGenerator.make_temporary(name)
-        identifier_map[name] = MapEntry(
+        identifier_map[name] = self.MapEntry(
             name = unique_name, 
             from_current_scope = True, 
             has_linkage = False)
@@ -141,7 +135,7 @@ class SemanticAnalyser:
             if prev_entry.from_current_scope and not prev_entry.has_linkage:
                 raise RuntimeError("Duplicate declaration")
 
-        identifier_map[func_decl.name] = MapEntry(
+        identifier_map[func_decl.name] = self.MapEntry(
             name = func_decl.name,
             from_current_scope = True,
             has_linkage = True
@@ -166,6 +160,8 @@ class SemanticAnalyser:
             case _:
                 raise RuntimeError(f"Could not validate semantics for declaration {decl}")
     
+
+class LoopLabeller:
     def ensure_label(self, current_label, kind):
         if current_label is None:
             raise RuntimeError(f"{kind} statement outside loop")
@@ -210,11 +206,20 @@ class SemanticAnalyser:
         body = self.label_block(fun_decl.body) if fun_decl.body else None
         return FunctionDeclaration(fun_decl.name, fun_decl.params, body)
 
-    def validate_program(self, program):
-        identifier_map: dict[str, MapEntry] = {}
-        new_function_decls = []
-        for function_decl in program.function_declarations:
-            resolved = self.resolve_function_declaration(function_decl, identifier_map)
-            labelled = self.label_function_declaration(resolved)
-            new_function_decls.append(labelled)
-        return Program(new_function_decls)
+class NameGenerator:
+    _counter = 0
+
+    @classmethod
+    def _next_id(cls):
+        val = cls._counter
+        cls._counter += 1
+        return val
+    
+    @classmethod
+    def make_temporary(cls, name = "tmp"):
+        unique_name = f"{name}.{cls._next_id()}"
+        return unique_name
+    
+    @classmethod
+    def make_label(cls, label_name):
+        return f"{label_name}{cls._next_id()}"

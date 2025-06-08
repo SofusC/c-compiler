@@ -14,7 +14,7 @@ def compile_c(file, flag):
         ast = parser.Parser(tokens).parse_program()
 
     if flag in ["validate", "tacky", "codegen", "all", "testall"]:
-        analysed_ast = semantic_analyser.SemanticAnalyser().validate_program(ast)
+        analysed_ast = semantic_analyser.validate_program(ast)
 
     if flag in ["tacky", "codegen", "all", "testall"]:
         emitted_ir = emitter.IREmitter().emit_program(analysed_ast)
