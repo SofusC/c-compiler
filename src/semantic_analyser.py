@@ -1,17 +1,13 @@
+from __future__ import annotations
 from c_ast import *
 from typing import NamedTuple
 import copy
 
 def validate_program(program):
-    identifier_map: dict[str, VariableResolver.MapEntry] = {}
-    resolver = VariableResolver()
-    labeller = LoopLabeller()
-    new_function_decls = []
-    for function_decl in program.function_declarations:
-        resolved = resolver.resolve_function_declaration(function_decl, identifier_map)
-        labelled = labeller.label_function_declaration(resolved)
-        new_function_decls.append(labelled)
-    return Program(new_function_decls)
+    program = VariableResolver().resolve_program(program)
+    TypeChecker().typecheck_program(program)
+    program = LoopLabeller().label_program(program)
+    return program
 
 class VariableResolver:
     class MapEntry(NamedTuple):
@@ -156,10 +152,151 @@ class VariableResolver:
                     raise RuntimeError(f"Local function definition {function_declaration}")
                 return FunDecl(self.resolve_function_declaration(function_declaration, identifier_map))
             case VarDecl(variable_declaration):
-                return FunDecl(self.resolve_variable_declaration(variable_declaration, identifier_map))
+                return VarDecl(self.resolve_variable_declaration(variable_declaration, identifier_map))
             case _:
                 raise RuntimeError(f"Could not validate semantics for declaration {decl}")
+            
+    def resolve_program(self, program):
+        identifier_map: dict[str, VariableResolver.MapEntry] = {}
+        new_function_decls = []
+        for function_decl in program.function_declarations:
+            resolved = self.resolve_function_declaration(function_decl, identifier_map)
+            new_function_decls.append(resolved)
+        return Program(new_function_decls)
+
     
+class TypeChecker:
+    class Int:
+        pass
+
+    @dataclass
+    class FunType:
+        param_count: int
+
+    Type = Int | FunType
+
+    @dataclass
+    class SymbolEntry:
+        type: TypeChecker.Type
+        defined: bool | None = None
+
+    symbols: dict[str, SymbolEntry] = {}
+
+    def typecheck_program(self, program):
+        for func_decl in program.function_declarations:
+            self.typecheck_function_declaration(func_decl)
+    
+    def typecheck_function_declaration(self, decl: FunctionDeclaration):
+        fun_type = self.FunType(len(decl.params))
+        has_body = decl.body is not None
+        already_defined = False
+        if decl.name in self.symbols:
+            old_decl = self.symbols[decl.name]
+            if old_decl.type != fun_type:
+                raise RuntimeError(f"Incompatible function declarations {fun_type} and {old_decl.type}")
+            already_defined = old_decl.defined
+            if already_defined and has_body:
+                raise RuntimeError(f"Function is defined more than once {decl}")
+        
+        self.symbols[decl.name] = self.SymbolEntry(
+            type = fun_type, 
+            defined = already_defined or has_body
+        )
+        if has_body:
+            for param in decl.params:
+                self.symbols[param] = self.SymbolEntry(self.Int())
+            self.typecheck_block(decl.body)
+
+    def typecheck_block(self, block):
+        for block_item in block.block_items:
+            self.typecheck_block_item(block_item)
+
+    def typecheck_block_item(self, item):
+        match item:
+            case D(decl):
+                self.typecheck_declaration(decl)
+            case S(stmt):
+                self.typecheck_statement(stmt)
+            case _:
+                raise RuntimeError(f"Cannot typecheck block item {item}")
+    
+    def typecheck_declaration(self, decl):
+        match decl:
+            case FunDecl(fun_decl):
+                self.typecheck_function_declaration(fun_decl)
+            case VarDecl(var_decl):
+                self.typecheck_variable_declaration(var_decl)
+            case _:
+                raise RuntimeError(f"Cannot typecheck declaration {decl}")
+
+    def typecheck_variable_declaration(self, var_decl):
+        self.symbols[var_decl.name] = self.SymbolEntry(self.Int())
+        if var_decl.init is not None:
+            self.typecheck_exp(var_decl.init)
+
+    def typecheck_statement(self, stmt):
+        match stmt:
+            case Return(exp) | Expression(exp):
+                self.typecheck_exp(exp)
+            case If(cond, then, else_):
+                self.typecheck_exp(cond)
+                self.typecheck_statement(then)
+                if else_:
+                    self.typecheck_statement(else_)
+            case Compound(block):
+                self.typecheck_block(block)
+            case Break() | Continue() | Null():
+                pass
+            case While(cond, body, _) | DoWhile(body, cond, _):
+                self.typecheck_exp(cond)
+                self.typecheck_statement(body)
+            case For(init, cond, post, body, _):
+                self.typecheck_for_init(init)
+                if cond:
+                    self.typecheck_exp(cond)
+                if post:
+                    self.typecheck_exp(post)
+                self.typecheck_statement(body)
+            case _:
+                raise RuntimeError(f"Cannot typecheck statement {stmt}")
+
+    def typecheck_for_init(self, init):
+        match init:
+            case InitDecl(decl):
+                self.typecheck_variable_declaration(decl)
+            case InitExp(None):
+                pass
+            case InitExp(exp):
+                self.typecheck_exp(exp)
+            case _:
+                raise RuntimeError(f"Cannot typecheck for init {init}")
+
+    def typecheck_exp(self, exp):
+        match exp:
+            case Constant():
+                pass
+            case Unary(_, exp):
+                self.typecheck_exp(exp)
+            case Binary(_, left, right) | Assignment(left, right):
+                self.typecheck_exp(left)
+                self.typecheck_exp(right)
+            case Conditional(cond, then, else_):
+                self.typecheck_exp(cond)
+                self.typecheck_exp(then)
+                self.typecheck_exp(else_)
+            case FunctionCall(identifier, args):
+                f_type = self.symbols[identifier].type
+                if isinstance(f_type, self.Int):
+                    raise RuntimeError(f"Variable used as function name {identifier}")
+                if f_type.param_count != len(args):
+                    raise RuntimeError(f"Function {identifier} called with wrong number of arguments, expected {f_type.param_count}, found {len(args)}")
+                for arg in args:
+                    self.typecheck_exp(arg)
+            case Var(v):
+                if not isinstance(self.symbols[v].type, self.Int):
+                    raise RuntimeError(f"Function name {v} used as variable")
+            case _:
+                raise RuntimeError(f"Cannot typecheck exp {exp}")
 
 class LoopLabeller:
     def ensure_label(self, current_label, kind):
@@ -205,6 +342,14 @@ class LoopLabeller:
     def label_function_declaration(self, fun_decl):
         body = self.label_block(fun_decl.body) if fun_decl.body else None
         return FunctionDeclaration(fun_decl.name, fun_decl.params, body)
+    
+    def label_program(self, program):
+        new_function_decls = []
+        for function_decl in program.function_declarations:
+            labelled = self.label_function_declaration(function_decl)
+            new_function_decls.append(labelled)
+        return Program(new_function_decls)
+
 
 class NameGenerator:
     _counter = 0
