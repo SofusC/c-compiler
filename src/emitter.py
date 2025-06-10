@@ -1,6 +1,7 @@
 from ir_ast import *
 from c_ast import *
 from semantic_analyser import NameGenerator
+from copy import deepcopy
 
 class IREmitter:
     instructions = []
@@ -81,6 +82,12 @@ class IREmitter:
         tacky_op = self.emit_binary_operator(binop)
         self.instructions.append(IRBinary(tacky_op, v1, v2, dst))
         return dst
+    
+    def emit_function_call(self, identifier, args):
+        new_args = [self.emit_exp(arg) for arg in args]
+        result = IRVar(NameGenerator.make_temporary())
+        self.instructions.append(IRFunCall(identifier, new_args, result))
+        return result
             
     def emit_exp(self, ast_node):
         match ast_node:
@@ -101,8 +108,10 @@ class IREmitter:
                 return lhs
             case Conditional(cond, then, else_):
                 return self.emit_conditional(cond, then, else_)
+            case FunctionCall(identifier, args):
+                return self.emit_function_call(identifier, args)
             case _:
-                raise RuntimeError(f"{ast_node} not implemented")
+                raise RuntimeError(f"Expression {ast_node} not implemented")
             
     def emit_conditional(self, cond, then, else_):
         # Evaluate condition
@@ -145,22 +154,22 @@ class IREmitter:
 
         if else_ is None:
             self.instructions.append(IRJumpIfZero(cond_tmp, end_label))
-            self.emit_block_item(then)
+            self.emit_statement(then)
         else:
             # With else branch
             else_label = NameGenerator.make_label("else")
             self.instructions.append(IRJumpIfZero(cond_tmp, else_label))
-            self.emit_block_item(then)
+            self.emit_statement(then)
             self.instructions.append(IRJump(end_label))
             self.instructions.append(IRLabel(else_label))
-            self.emit_block_item(else_)
+            self.emit_statement(else_)
 
         self.instructions.append(IRLabel(end_label))  
 
     def emit_for_init(self, for_init):
         match for_init:
             case InitDecl(decl):
-                return self.emit_declaration(decl)
+                return self.emit_variable_declaration(decl)
             case InitExp(None):
                 pass
             case InitExp(exp):
@@ -213,15 +222,20 @@ class IREmitter:
                 self.instructions.append(IRJump(f"start_{label}"))
                 self.instructions.append(break_)
 
+    def emit_variable_declaration(self, decl: VariableDeclaration):
+        if decl.init is None:
+            return
+        result = self.emit_exp(decl.init)
+        lhs = IRVar(decl.name)
+        self.instructions.append(IRCopy(result, lhs))
+        return lhs
+            
     def emit_declaration(self, decl):
         match decl:
-            case Declaration(_, None):
-                pass
-            case Declaration(name, rhs):
-                result = self.emit_exp(rhs)
-                lhs = IRVar(name)
-                self.instructions.append(IRCopy(result, lhs))
-                return lhs
+            case FunDecl(fun_decl):
+                self.emit_function_declaration(fun_decl)
+            case VarDecl(var_decl):
+                self.emit_variable_declaration(var_decl)
             case _:
                 raise RuntimeError(f"Declaration {decl} not implemented")
 
@@ -249,22 +263,26 @@ class IREmitter:
 
     def emit_block_item(self, item):
         match item:
-            case Declaration():
-                self.emit_declaration(item)
-            case Statement():
-                self.emit_statement(item)
+            case D(declaration):
+                self.emit_declaration(declaration)
+            case S(statement):
+                self.emit_statement(statement)
             case _:
                 raise RuntimeError(f"BlockItem {item} not implemented")
 
-    def emit_block(self, block):
+    def emit_block(self, block: Block):
         for block_item in block.block_items:
             self.emit_block_item(block_item)
         return self.instructions
     
-    def emit_function(self, ast_node):
-        instructions = self.emit_block(ast_node.body)
+    def emit_function_declaration(self, function_declaration: FunctionDeclaration):
+        if function_declaration.body is None:
+            return
+        self.instructions = []
+        instructions = self.emit_block(function_declaration.body)
         instructions.append(IRReturn(IRConstant(0)))
-        return IRFunctionDefinition(ast_node.name, instructions)
+        return IRFunctionDefinition(function_declaration.name, function_declaration.params, deepcopy(instructions))
     
-    def emit_program(self, ast_node):
-        return IRProgram(self.emit_function(ast_node.function))
+    def emit_program(self, program):
+        functions = [self.emit_function_declaration(func) for func in program.function_declarations]
+        return IRProgram(functions)

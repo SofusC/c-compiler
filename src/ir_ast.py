@@ -9,11 +9,12 @@ class TackyNode(ABC):
 
 @dataclass
 class IRProgram(TackyNode):
-    function: IRFunctionDefinition
+    functions: List[IRFunctionDefinition]
 
 @dataclass
 class IRFunctionDefinition(TackyNode):
     name: str
+    params: List[str]
     body: List[IRInstruction]
     
 
@@ -60,6 +61,12 @@ class IRJumpIfNotZero(IRInstruction):
 class IRLabel(IRInstruction):
     identifier: str
 
+@dataclass
+class IRFunCall(IRInstruction):
+    fun_name: str
+    args: List[IRVal]
+    dst: IRVal
+    
 
 
 class IRVal(TackyNode):
