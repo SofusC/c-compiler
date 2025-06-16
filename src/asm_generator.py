@@ -1,6 +1,6 @@
 from ir_ast import *
 from assembly_ast import *
-import traceback
+import traceback #TODO: Remove
         
 def lower_program(program: IRProgram):
     functions = [lower_function_definition(function) for function in program.functions]
@@ -70,14 +70,14 @@ def lower_fun_call(fun_name, args: List[IRVal], dst):
         else:
             instructions.extend([AsmMov(assembly_arg, AsmReg(AsmRegs.AX)),
                                  AsmPush(AsmReg(AsmRegs.AX))])
-        instructions.append(AsmCall(fun_name))
+    instructions.append(AsmCall(fun_name))
 
-        bytes_to_remove = 8 * len(stack_args) + stack_padding
-        if bytes_to_remove != 0:
-            instructions.append(AsmDeallocateStack(bytes_to_remove))
+    bytes_to_remove = 8 * len(stack_args) + stack_padding
+    if bytes_to_remove != 0:
+        instructions.append(AsmDeallocateStack(bytes_to_remove))
 
-        assembly_dst = lower_operand(dst)
-        instructions.append(AsmMov(AsmReg(AsmRegs.AX), assembly_dst))
+    assembly_dst = lower_operand(dst)
+    instructions.append(AsmMov(AsmReg(AsmRegs.AX), assembly_dst))
     return instructions
 
 def lower_unary(unop, src, dst):
@@ -155,5 +155,5 @@ def lower_operand(ast_node):
         case IRVar(identifier):
             return AsmPseudo(identifier)
         case _:
-            traceback.print_stack()
+            traceback.print_stack() # TODO: Remove
             raise NotImplementedError(f"IR operand object {ast_node} can not be transformed to assembly AST yet.")

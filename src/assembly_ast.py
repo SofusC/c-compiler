@@ -124,19 +124,23 @@ class AsmCondCode(Enum):
     LE = f"le"
     
 class AsmRegs(Enum):
-    AX  = (f"%eax",  f"%al")
-    CX  = (f"%ecx",  f"%cl")
-    DX  = (f"%edx",  f"%dl")
-    DI  = (f"%edi",  f"%dil")
-    SI  = (f"%esi",  f"%sil")
-    R8  = (f"%r8d",  f"%r8b")
-    R9  = (f"%r9d",  f"%r9b")
-    R10 = (f"%r10d", f"%r10b")
-    R11 = (f"%r11d", f"%r11b")
+    AX  = (f"%rax",  f"%eax",  f"%al")
+    CX  = (f"%rcx",  f"%ecx",  f"%cl")
+    DX  = (f"%rdx",  f"%edx",  f"%dl")
+    DI  = (f"%rdi",  f"%edi",  f"%dil")
+    SI  = (f"%rsi",  f"%esi",  f"%sil")
+    R8  = (f"%r8",   f"%r8d",  f"%r8b")
+    R9  = (f"%r9",   f"%r9d",  f"%r9b")
+    R10 = (f"%r10",  f"%r10d", f"%r10b")
+    R11 = (f"%r11",  f"%r11d", f"%r11b")
 
-    def __init__(self, dword, byte):
+    def __init__(self, qword, dword, byte):
+        self._qword = qword
         self._dword = dword
         self._byte = byte
+
+    def as_qword(self):
+        return self._qword
 
     def as_dword(self):
         return self._dword

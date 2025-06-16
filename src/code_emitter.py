@@ -1,8 +1,10 @@
 from assembly_ast import *
+from semantic_analyser import symbol_table
 
 def emit_program_code(program):
-    function = program.function_definition
-    res = emit_function(function.name, function.instructions)
+    res = []
+    for function in program.function_definitions:
+        res.extend(emit_function(function.name, function.instructions))
     res.append('   .section .note.GNU-stack,"",@progbits')
     return "\n".join(res) + "\n"
 
@@ -48,6 +50,16 @@ def emit_code(ast_node):
             return [f"set{cc.value}   {operand}"]
         case AsmLabel(label):
             return [f".L{label}:"]
+        case AsmDeallocateStack(int):
+            return [f"addq   ${int}, %rsp"]
+        case AsmPush(operand):
+            operand = emit_operand(operand, "qword")
+            return [f"pushq   {operand}"]
+        case AsmCall(func):
+            res = f"call   {func}"
+            if func in symbol_table:
+                res += "@PLT"
+            return [res]
         case _:
             raise NotImplementedError(f"Cant generate assembly code for {ast_node}")
 
@@ -56,9 +68,13 @@ def emit_operand(operand, size = "dword"):
         case AsmReg(reg):
             if size == "byte":
                 return reg.as_byte()
-            else:
+            if size == "dword":
                 return reg.as_dword()
+            if size == "qword":
+                return reg.as_qword()
         case AsmStack(offset):
             return f"{offset}(%rbp)"
         case AsmImm(int):
             return f"${int}"
+        case _:
+            raise NotImplementedError(f"Cant generate assembly code for {operand}")

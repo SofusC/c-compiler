@@ -10,20 +10,20 @@ import semantic_analyser
 def compile_c(file, flag):
     output = None
     tokens = lexer.lex(file)
-    if flag in ["parse", "validate", "tacky", "codegen", "all", "testall"]:
+    if flag in ["parse", "validate", "tacky", "codegen", "all", "testall", "c"]:
         ast = parser.Parser(tokens).parse_program()
 
-    if flag in ["validate", "tacky", "codegen", "all", "testall"]:
+    if flag in ["validate", "tacky", "codegen", "all", "testall", "c"]:
         analysed_ast = semantic_analyser.validate_program(ast)
 
-    if flag in ["tacky", "codegen", "all", "testall"]:
+    if flag in ["tacky", "codegen", "all", "testall", "c"]:
         emitted_ir = emitter.IREmitter().emit_program(analysed_ast)
 
-    if flag in ["codegen", "all", "testall"]:
+    if flag in ["codegen", "all", "testall", "c"]:
         asm = asm_generator.lower_program(emitted_ir)
         asm_allocator.AsmAllocator().legalize(asm)
 
-    if flag in ["all", "testall"]:
+    if flag in ["all", "testall", "c"]:
         output = file[:-2] + ".s"
         with open(output, "w") as f:
             assembly_code = code_emitter.emit_program_code(asm)

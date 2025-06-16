@@ -3,6 +3,8 @@ from c_ast import *
 from typing import NamedTuple
 import copy
 
+symbol_table: dict[str, TypeChecker.SymbolEntry] = {}
+
 def validate_program(program):
     program = VariableResolver().resolve_program(program)
     TypeChecker().typecheck_program(program)
@@ -180,8 +182,6 @@ class TypeChecker:
         type: TypeChecker.Type
         defined: bool | None = None
 
-    symbols: dict[str, SymbolEntry] = {}
-
     def typecheck_program(self, program):
         for func_decl in program.function_declarations:
             self.typecheck_function_declaration(func_decl)
@@ -190,21 +190,21 @@ class TypeChecker:
         fun_type = self.FunType(len(decl.params))
         has_body = decl.body is not None
         already_defined = False
-        if decl.name in self.symbols:
-            old_decl = self.symbols[decl.name]
+        if decl.name in symbol_table:
+            old_decl = symbol_table[decl.name]
             if old_decl.type != fun_type:
                 raise RuntimeError(f"Incompatible function declarations {fun_type} and {old_decl.type}")
             already_defined = old_decl.defined
             if already_defined and has_body:
                 raise RuntimeError(f"Function is defined more than once {decl}")
         
-        self.symbols[decl.name] = self.SymbolEntry(
+        symbol_table[decl.name] = self.SymbolEntry(
             type = fun_type, 
             defined = already_defined or has_body
         )
         if has_body:
             for param in decl.params:
-                self.symbols[param] = self.SymbolEntry(self.Int())
+                symbol_table[param] = self.SymbolEntry(self.Int())
             self.typecheck_block(decl.body)
 
     def typecheck_block(self, block):
@@ -230,7 +230,7 @@ class TypeChecker:
                 raise RuntimeError(f"Cannot typecheck declaration {decl}")
 
     def typecheck_variable_declaration(self, var_decl):
-        self.symbols[var_decl.name] = self.SymbolEntry(self.Int())
+        symbol_table[var_decl.name] = self.SymbolEntry(self.Int())
         if var_decl.init is not None:
             self.typecheck_exp(var_decl.init)
 
@@ -285,7 +285,7 @@ class TypeChecker:
                 self.typecheck_exp(then)
                 self.typecheck_exp(else_)
             case FunctionCall(identifier, args):
-                f_type = self.symbols[identifier].type
+                f_type = symbol_table[identifier].type
                 if isinstance(f_type, self.Int):
                     raise RuntimeError(f"Variable used as function name {identifier}")
                 if f_type.param_count != len(args):
@@ -293,7 +293,7 @@ class TypeChecker:
                 for arg in args:
                     self.typecheck_exp(arg)
             case Var(v):
-                if not isinstance(self.symbols[v].type, self.Int):
+                if not isinstance(symbol_table[v].type, self.Int):
                     raise RuntimeError(f"Function name {v} used as variable")
             case _:
                 raise RuntimeError(f"Cannot typecheck exp {exp}")
