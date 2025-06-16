@@ -116,11 +116,11 @@ class AsmStack(AsmOperand):
 
 
 class AsmCondCode(Enum):
-    E  = f"e"
+    E  = f"e "
     NE = f"ne"
-    G  = f"g"
+    G  = f"g "
     GE = f"ge"
-    L  = f"l"
+    L  = f"l "
     LE = f"le"
     
 class AsmRegs(Enum):
@@ -147,3 +147,7 @@ class AsmRegs(Enum):
     
     def as_byte(self):
         return self._byte
+    
+    @classmethod
+    def system_v_argument_regs(cls):
+        return [cls.DI, cls.SI, cls.DX, cls.CX, cls.R8, cls.R9]

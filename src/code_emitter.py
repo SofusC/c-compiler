@@ -20,34 +20,32 @@ def emit_function(name, instructions):
 def emit_code(ast_node):
     match ast_node:
         case AsmMov(src, dst):
-            return [f"movl   {emit_code(src)}, {emit_code(dst)}"]
+            return [f"movl   {emit_operand(src)}, {emit_operand(dst)}"]
         case AsmRet():
             res = [f"movq   %rbp, %rsp",
                    f"popq   %rbp",
                    f"ret"]
             return res
         case AsmUnary(unop, operand):
-            return [f"{unop.value}   {emit_code(operand)}"]
+            return [f"{unop.value}   {emit_operand(operand)}"]
         case AsmBinary(binop, src, dst):
-            src, dst = emit_code(src), emit_code(dst)
+            src, dst = emit_operand(src), emit_operand(dst)
             return [f"{binop.value}   {src}, {dst}"]
         case AsmIdiv(operand):
-            return [f"idivl  {emit_code(operand)}"]
+            return [f"idivl  {emit_operand(operand)}"]
         case AsmCdq():
             return [f"cdq"]
         case AsmAllocateStack(int):
             return [f"subq   ${int},  %rsp"]
-        case AsmOperand() as operand:
-            return emit_operand(operand)
         case AsmCmp(operand1, operand2):
-            return [f"cmpl   {emit_code(operand1)}, {emit_code(operand2)}"]
+            return [f"cmpl   {emit_operand(operand1)}, {emit_operand(operand2)}"]
         case AsmJmp(label):
             return [f"jmp   .L{label}"]
         case AsmJmpCC(cc, label):
             return [f"j{cc.value}    .L{label}"]
         case AsmSetCC(cc, operand):
             operand = emit_operand(operand, "byte")
-            return [f"set{cc.value}   {operand}"]
+            return [f"set{cc.value}  {operand}"]
         case AsmLabel(label):
             return [f".L{label}:"]
         case AsmDeallocateStack(int):

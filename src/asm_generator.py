@@ -1,13 +1,29 @@
 from ir_ast import *
 from assembly_ast import *
-import traceback #TODO: Remove
+
+_RELATIONAL_MAP = {
+    IRBinaryOperator.Equal          : AsmCondCode.E,
+    IRBinaryOperator.NotEqual       : AsmCondCode.NE,
+    IRBinaryOperator.LessThan       : AsmCondCode.L,
+    IRBinaryOperator.LessOrEqual    : AsmCondCode.LE,
+    IRBinaryOperator.GreaterThan    : AsmCondCode.G,
+    IRBinaryOperator.GreaterOrEqual : AsmCondCode.GE,
+}
+
+_OPERATOR_MAP = {
+    IRUnaryOperator.Complement      : AsmUnaryOperator.Not,
+    IRUnaryOperator.Negate          : AsmUnaryOperator.Neg,
+    IRBinaryOperator.Add            : AsmBinaryOperator.Add,
+    IRBinaryOperator.Subtract       : AsmBinaryOperator.Sub,
+    IRBinaryOperator.Multiply       : AsmBinaryOperator.Mult,
+}
         
 def lower_program(program: IRProgram):
     functions = [lower_function_definition(function) for function in program.functions]
     return AsmProgram(functions)
 
 def lower_function_definition(func_def: IRFunctionDefinition):
-    param_regs = [AsmRegs.DI, AsmRegs.SI, AsmRegs.DX, AsmRegs.CX, AsmRegs.R8, AsmRegs.R9] #TODO: Flyt til class?
+    param_regs = AsmRegs.system_v_argument_regs()
     asm_instructions = []
     for reg, param in zip(param_regs, func_def.params):
         asm_instructions.append(AsmMov(AsmReg(reg), lower_operand(IRVar(param))))
@@ -46,7 +62,7 @@ def lower_instr(ast_node):
             raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
         
 def lower_fun_call(fun_name, args: List[IRVal], dst):
-    arg_registers = [AsmRegs.DI, AsmRegs.SI, AsmRegs.DX, AsmRegs.CX, AsmRegs.R8, AsmRegs.R9] #TODO: Flyt til class?
+    arg_registers = AsmRegs.system_v_argument_regs()
     instructions = []
     register_args, stack_args = args[:6], args[6:]
     stack_padding = 0
@@ -116,38 +132,18 @@ def lower_binary(binop, src1, src2, dst):
             return [AsmMov(src1, dst),
                     AsmBinary(binop, src2, dst)]
 
-def lower_relational(ast_node): #TODO: Rewrite these to use dicts
-    match ast_node:
-        case IRBinaryOperator.Equal:
-            return AsmCondCode.E
-        case IRBinaryOperator.NotEqual:
-            return AsmCondCode.NE
-        case IRBinaryOperator.LessThan:
-            return AsmCondCode.L
-        case IRBinaryOperator.LessOrEqual:
-            return AsmCondCode.LE
-        case IRBinaryOperator.GreaterThan:
-            return AsmCondCode.G
-        case IRBinaryOperator.GreaterOrEqual:
-            return AsmCondCode.GE
-        case _:
-            raise NotImplementedError(f"IR relational object {ast_node} can not be transformed to assembly AST yet.")
+def lower_relational(ast_node):
+    try:
+        return _RELATIONAL_MAP[ast_node]
+    except KeyError:
+        raise NotImplementedError(f"IR relational object {ast_node} cannot be transformed to assembly AST yet.")
 
 def lower_operator(ast_node):
-    match ast_node:
-        case IRUnaryOperator.Complement:
-            return AsmUnaryOperator.Not
-        case IRUnaryOperator.Negate:
-            return AsmUnaryOperator.Neg
-        case IRBinaryOperator.Add:
-            return AsmBinaryOperator.Add
-        case IRBinaryOperator.Subtract:
-            return AsmBinaryOperator.Sub
-        case IRBinaryOperator.Multiply:
-            return AsmBinaryOperator.Mult
-        case _:
-            raise NotImplementedError(f"IR operator object {ast_node} can not be transformed to assembly AST yet.")
-        
+    try:
+        return _OPERATOR_MAP[ast_node]
+    except KeyError:
+        raise NotImplementedError(f"IR operator object {ast_node} cannot be transformed to assembly AST yet.")
+
 def lower_operand(ast_node):
     match ast_node:
         case IRConstant(constant):
@@ -155,5 +151,4 @@ def lower_operand(ast_node):
         case IRVar(identifier):
             return AsmPseudo(identifier)
         case _:
-            traceback.print_stack() # TODO: Remove
             raise NotImplementedError(f"IR operand object {ast_node} can not be transformed to assembly AST yet.")
