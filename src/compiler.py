@@ -20,11 +20,8 @@ def compile_c(file, flag):
         emitted_ir = emitter.IREmitter().emit_program(analysed_ast)
 
     if flag in ["codegen", "all", "testall"]:
-        asm = asm_generator.lower_to_asm(emitted_ir)
-        allocator = asm_allocator.AsmAllocator()
-        allocator.lower_pseudo_regs(asm)
-        allocator.add_stack_frame(asm)
-        allocator.legalize_operands(asm)
+        asm = asm_generator.lower_program(emitted_ir)
+        asm_allocator.AsmAllocator().legalize(asm)
 
     if flag in ["all", "testall"]:
         output = file[:-2] + ".s"

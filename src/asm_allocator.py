@@ -1,10 +1,6 @@
 from assembly_ast import *
 
 class AsmAllocator():
-    def __init__(self):
-        self.identifiers = {}
-        self.stack_counter = 0
-
     def _two_stack_operands(self, instruction):
         tmp = AsmReg(AsmRegs.R10)
         match instruction:
@@ -40,16 +36,29 @@ class AsmAllocator():
             case _:
                 return [instruction]
     
-    def legalize_operands(self, program):
-        function = program.function_definition
+    def legalize_operands(self, function_definition):
+        #function = program.function_definition
+        #new_instructions = []
+        #for instruction in function.instructions:
+        #    new_instructions.extend(self._legalize(instruction))
+        #function.instructions = new_instructions
+        #for function_definition in program.function_definitions:
+            #instructions = function_definition.instructions
+            #function_definition.instructions = [self._legalize(instr) for instr in function_definition.instructions]
+            #new_instructions = []
+            #for instruction in function_definition.instructions:
+            #    new_instructions.extend(self._legalize(instruction))
+            #function_definition.instructions = new_instructions
         new_instructions = []
-        for instruction in function.instructions:
-            new_instructions.extend(self._legalize(instruction))
-        function.instructions = new_instructions
+        for instr in function_definition.instructions:
+            new_instructions.extend(self._legalize(instr))
+        function_definition.instructions = new_instructions
 
-    def add_stack_frame(self, program):
-        function = program.function_definition
-        function.instructions[:0] = [AsmAllocateStack(abs(self.stack_counter))]
+    def add_stack_frame(self, function_definition):
+        #for function_definition in program.function_definitions:
+        size = abs(self.stack_counter)
+        size += 16 - (size % 16)
+        function_definition.instructions[:0] = [AsmAllocateStack(size)]
 
     def _allocate_stack_slot(self, identifier):
         if identifier not in self.identifiers:
@@ -57,7 +66,7 @@ class AsmAllocator():
             self.identifiers[identifier] = self.stack_counter
         return self.identifiers[identifier]
 
-    def lower_pseudo_regs(self, program): # TODO: this function needs refactoring
+    def lower_pseudo_regs(self, function_definition): # TODO: this function needs refactoring
         def remove_pseudos(ast_node):
             match ast_node:
                 case AsmPseudo(identifier):
@@ -79,9 +88,24 @@ class AsmAllocator():
                     return AsmIdiv(remove_pseudos(src))
                 case AsmSetCC(cond_code, operand):
                     return AsmSetCC(cond_code, remove_pseudos(operand))
+                case AsmPush(operand):
+                    return AsmPush(remove_pseudos(operand))
                 case _:
                     return instruction
-        instructions = program.function_definition.instructions
-        lowered_instrs = [check_instruction(instr) for instr in instructions]
-        program.function_definition.instructions = lowered_instrs
-            
+        
+        self.identifiers = {}
+        self.stack_counter = 0
+        #new_function_definitions = []
+        #for function_definition in program.function_definitions:
+            #instructions = function_definition.instructions
+        function_definition.instructions = [check_instruction(instr) for instr in function_definition.instructions]
+            #new_function_definitions.append(lowered_instrs)
+            #raise Error("This is wrong, edit in place instead")
+        #program.function_definitions = new_function_definitions
+    
+    def legalize(self, program):
+        for function_definition in program.function_definitions:
+            self.lower_pseudo_regs(function_definition)
+            self.add_stack_frame(function_definition)
+            self.legalize_operands(function_definition)
+        #TODO: Modfiy or return new?

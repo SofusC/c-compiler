@@ -4,7 +4,7 @@ from semantic_analyser import NameGenerator
 from copy import deepcopy
 
 class IREmitter:
-    instructions = []
+    instructions = [] # TODO: Remove?
 
     unop_map = {
         UnaryOperator.Complement     : IRUnaryOperator.Complement,
@@ -284,5 +284,5 @@ class IREmitter:
         return IRFunctionDefinition(function_declaration.name, function_declaration.params, deepcopy(instructions))
     
     def emit_program(self, program):
-        functions = [self.emit_function_declaration(func) for func in program.function_declarations]
+        functions = [func_decl for func in program.function_declarations if (func_decl := self.emit_function_declaration(func)) is not None]
         return IRProgram(functions)

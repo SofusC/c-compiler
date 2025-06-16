@@ -5,10 +5,10 @@ from typing import List
 
 @dataclass
 class AsmProgram():
-    function_definition: AsmFunction
+    function_definitions: List[AsmFunctionDef]
 
 @dataclass
-class AsmFunction():
+class AsmFunctionDef():
     name: str
     instructions: List[AsmInstruction]
 
@@ -67,6 +67,18 @@ class AsmLabel(AsmInstruction):
 class AsmAllocateStack(AsmInstruction):
     int: int
 
+@dataclass
+class AsmDeallocateStack(AsmInstruction):
+    int: int
+
+@dataclass
+class AsmPush(AsmInstruction):
+    operand: AsmOperand
+
+@dataclass
+class AsmCall(AsmInstruction):
+    identifier: str
+
 class AsmRet(AsmInstruction):
     pass
 
@@ -113,7 +125,12 @@ class AsmCondCode(Enum):
     
 class AsmRegs(Enum):
     AX  = (f"%eax",  f"%al")
+    CX  = (f"%ecx",  f"%cl")
     DX  = (f"%edx",  f"%dl")
+    DI  = (f"%edi",  f"%dil")
+    SI  = (f"%esi",  f"%sil")
+    R8  = (f"%r8d",  f"%r8b")
+    R9  = (f"%r9d",  f"%r9b")
     R10 = (f"%r10d", f"%r10b")
     R11 = (f"%r11d", f"%r11b")
 

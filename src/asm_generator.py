@@ -1,15 +1,22 @@
 from ir_ast import *
 from assembly_ast import *
+import traceback
+        
+def lower_program(program: IRProgram):
+    functions = [lower_function_definition(function) for function in program.functions]
+    return AsmProgram(functions)
 
-def lower_to_asm(ast_node):
-    match ast_node: # TODO: This is a bit weird to do as patternmatch.
-        case IRProgram(func):
-            return AsmProgram(lower_to_asm(func))
-        case IRFunctionDefinition(name, instructions):
-            asm_instructions = []
-            for instruction in instructions:
-                asm_instructions += lower_instr(instruction)
-            return AsmFunction(name, asm_instructions)
+def lower_function_definition(func_def: IRFunctionDefinition):
+    param_regs = [AsmRegs.DI, AsmRegs.SI, AsmRegs.DX, AsmRegs.CX, AsmRegs.R8, AsmRegs.R9] #TODO: Flyt til class?
+    asm_instructions = []
+    for reg, param in zip(param_regs, func_def.params):
+        asm_instructions.append(AsmMov(AsmReg(reg), lower_operand(IRVar(param))))
+    for i, param in enumerate(func_def.params[len(param_regs):]):
+        asm_instructions.append(AsmMov(AsmStack(16 + i*8), lower_operand(IRVar(param))))
+        
+    for instruction in func_def.body:
+        asm_instructions += lower_instr(instruction)
+    return AsmFunctionDef(func_def.name, asm_instructions)
 
 def lower_instr(ast_node):
     match ast_node:
@@ -33,9 +40,45 @@ def lower_instr(ast_node):
             return [AsmMov(lower_operand(src), lower_operand(dst))]
         case IRLabel(identifier):
             return [AsmLabel(identifier)]
+        case IRFunCall(fun_name, args, dst):
+            return lower_fun_call(fun_name, args, dst)
         case _:
             raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
         
+def lower_fun_call(fun_name, args: List[IRVal], dst):
+    arg_registers = [AsmRegs.DI, AsmRegs.SI, AsmRegs.DX, AsmRegs.CX, AsmRegs.R8, AsmRegs.R9] #TODO: Flyt til class?
+    instructions = []
+    register_args, stack_args = args[:6], args[6:]
+    stack_padding = 0
+    if len(stack_args) % 2 == 1:
+        stack_padding = 8
+
+    if stack_padding != 0:
+        instructions.append(AsmAllocateStack(stack_padding))
+
+    reg_index = 0
+    for tacky_arg in register_args:
+        r = arg_registers[reg_index]
+        assembly_arg = lower_operand(tacky_arg)
+        instructions.append(AsmMov(assembly_arg, AsmReg(r)))
+        reg_index += 1
+
+    for tacky_arg in stack_args[::-1]:
+        assembly_arg = lower_operand(tacky_arg)
+        if isinstance(assembly_arg, AsmImm) or isinstance(assembly_arg, AsmReg): #Always true?
+            instructions.append(AsmPush(assembly_arg))
+        else:
+            instructions.extend([AsmMov(assembly_arg, AsmReg(AsmRegs.AX)),
+                                 AsmPush(AsmReg(AsmRegs.AX))])
+        instructions.append(AsmCall(fun_name))
+
+        bytes_to_remove = 8 * len(stack_args) + stack_padding
+        if bytes_to_remove != 0:
+            instructions.append(AsmDeallocateStack(bytes_to_remove))
+
+        assembly_dst = lower_operand(dst)
+        instructions.append(AsmMov(AsmReg(AsmRegs.AX), assembly_dst))
+    return instructions
 
 def lower_unary(unop, src, dst):
     src, dst = lower_operand(src), lower_operand(dst)
@@ -73,7 +116,7 @@ def lower_binary(binop, src1, src2, dst):
             return [AsmMov(src1, dst),
                     AsmBinary(binop, src2, dst)]
 
-def lower_relational(ast_node):
+def lower_relational(ast_node): #TODO: Rewrite these to use dicts
     match ast_node:
         case IRBinaryOperator.Equal:
             return AsmCondCode.E
@@ -88,7 +131,7 @@ def lower_relational(ast_node):
         case IRBinaryOperator.GreaterOrEqual:
             return AsmCondCode.GE
         case _:
-            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
+            raise NotImplementedError(f"IR relational object {ast_node} can not be transformed to assembly AST yet.")
 
 def lower_operator(ast_node):
     match ast_node:
@@ -103,7 +146,7 @@ def lower_operator(ast_node):
         case IRBinaryOperator.Multiply:
             return AsmBinaryOperator.Mult
         case _:
-            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
+            raise NotImplementedError(f"IR operator object {ast_node} can not be transformed to assembly AST yet.")
         
 def lower_operand(ast_node):
     match ast_node:
@@ -112,4 +155,5 @@ def lower_operand(ast_node):
         case IRVar(identifier):
             return AsmPseudo(identifier)
         case _:
-            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
+            traceback.print_stack()
+            raise NotImplementedError(f"IR operand object {ast_node} can not be transformed to assembly AST yet.")
