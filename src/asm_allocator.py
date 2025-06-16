@@ -7,6 +7,9 @@ STACK_ALIGNMENT = 16
 
 class AsmAllocator():
     def _two_stack_operands(self, instruction):
+        """
+        Transforms instructions with two stack operands into legal forms.
+        """
         match instruction:
             case AsmMov(src, dst):
                 return [AsmMov(src, TMP_REG_1), 
@@ -21,17 +24,22 @@ class AsmAllocator():
     def _legalize(self, instruction):
         match instruction:
             case AsmMov(AsmStack(), AsmStack()) | AsmCmp(AsmStack(), AsmStack()):
+                # mov and cmp doesnt allow two memory operands.
                 return self._two_stack_operands(instruction)
             case AsmBinary(binop, AsmStack(), AsmStack()) if binop in (AsmBinaryOperator.Add, AsmBinaryOperator.Sub):
+                # add and sub doesnt allow two memory operands.
                 return self._two_stack_operands(instruction)
             case AsmBinary(AsmBinaryOperator.Mult, src, AsmStack() as dst):
+                # mul doesnt allow dst operand to be in memory
                 return [AsmMov(dst, TMP_REG_2), 
                         AsmBinary(AsmBinaryOperator.Mult, src, TMP_REG_2),
                         AsmMov(TMP_REG_2, dst)]
             case AsmCmp(operand1, AsmImm() as operand2):
+                # cmp doesnt allow second operand to be immediate value
                 return [AsmMov(operand2, TMP_REG_2),
                         AsmCmp(operand1, TMP_REG_2)]
             case AsmIdiv(AsmImm() as operand):
+                # idiv doesnt allow operand to be immediate value
                 return [AsmMov(operand, TMP_REG_1),
                         AsmIdiv(TMP_REG_1)]
             case _:
@@ -52,6 +60,9 @@ class AsmAllocator():
         return self.identifiers[identifier]
 
     def lower_pseudo_regs(self, function_definition):
+        """
+        Replaces pseudo-registers with locations on the stack.
+        """
         def remove_pseudos(node):
             if isinstance(node, AsmPseudo):
                 return AsmStack(self._allocate_stack_slot(node.identifier))
