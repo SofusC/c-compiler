@@ -42,7 +42,7 @@ def main():
     for arg in sys.argv[1:]:
         if arg[0:2] == "--":
             stage = arg[2:]
-        if arg[0:2] == "-c":
+        elif arg[0:2] == "-c":
             stage = "c"
         else:
             input_files.append(arg)

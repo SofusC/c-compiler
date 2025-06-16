@@ -13,53 +13,53 @@ def emit_function(name, instructions):
            f"{name}:",
            f"   pushq  %rbp",
            f"   movq   %rsp, %rbp"]
-    for instruction in instructions:
-        res.extend(["   " + line for line in emit_code(instruction)])
+    for instr in instructions:
+        lines = emit_instruction(instr)
+        if isinstance(lines, list):
+            res.extend("   " + line for line in lines)
+        else:
+            res.append("   " + lines)
     return res
         
-def emit_code(ast_node):
+def emit_instruction(ast_node):
     match ast_node:
         case AsmMov(src, dst):
-            return [f"movl   {emit_operand(src)}, {emit_operand(dst)}"]
+            return f"movl   {emit_operand(src)}, {emit_operand(dst)}"
         case AsmRet():
-            res = [f"movq   %rbp, %rsp",
-                   f"popq   %rbp",
-                   f"ret"]
-            return res
+            return [
+                f"movq   %rbp, %rsp",
+                f"popq   %rbp",
+                f"ret"
+            ]
         case AsmUnary(unop, operand):
-            return [f"{unop.value}   {emit_operand(operand)}"]
+            return f"{unop.value}   {emit_operand(operand)}"
         case AsmBinary(binop, src, dst):
-            src, dst = emit_operand(src), emit_operand(dst)
-            return [f"{binop.value}   {src}, {dst}"]
+            return f"{binop.value}   {emit_operand(src)}, {emit_operand(dst)}"
         case AsmIdiv(operand):
-            return [f"idivl  {emit_operand(operand)}"]
+            return f"idivl  {emit_operand(operand)}"
         case AsmCdq():
-            return [f"cdq"]
-        case AsmAllocateStack(int):
-            return [f"subq   ${int},  %rsp"]
-        case AsmCmp(operand1, operand2):
-            return [f"cmpl   {emit_operand(operand1)}, {emit_operand(operand2)}"]
+            return f"cdq"
+        case AsmAllocateStack(size):
+            return f"subq   ${size},  %rsp"
+        case AsmCmp(op1, op2):
+            return f"cmpl   {emit_operand(op1)}, {emit_operand(op2)}"
         case AsmJmp(label):
-            return [f"jmp   .L{label}"]
+            return f"jmp    .L{label}"
         case AsmJmpCC(cc, label):
-            return [f"j{cc.value}    .L{label}"]
+            return f"j{cc.value}    .L{label}"
         case AsmSetCC(cc, operand):
-            operand = emit_operand(operand, "byte")
-            return [f"set{cc.value}  {operand}"]
+            return f"set{cc.value}  {emit_operand(operand, 'byte')}"
         case AsmLabel(label):
-            return [f".L{label}:"]
-        case AsmDeallocateStack(int):
-            return [f"addq   ${int}, %rsp"]
+            return f".L{label}:"
+        case AsmDeallocateStack(size):
+            return f"addq   ${size}, %rsp"
         case AsmPush(operand):
-            operand = emit_operand(operand, "qword")
-            return [f"pushq   {operand}"]
+            return f"pushq   {emit_operand(operand, 'qword')}"
         case AsmCall(func):
-            res = f"call   {func}"
-            if func in symbol_table:
-                res += "@PLT"
-            return [res]
+            suffix = "@PLT" if func in symbol_table else ""
+            return f"call   {func}{suffix}"
         case _:
-            raise NotImplementedError(f"Cant generate assembly code for {ast_node}")
+            raise NotImplementedError(f"Can't generate assembly code for {ast_node}")
 
 def emit_operand(operand, size = "dword"):
     match operand:
