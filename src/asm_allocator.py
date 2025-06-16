@@ -67,25 +67,12 @@ class AsmAllocator():
             if isinstance(node, AsmPseudo):
                 return AsmStack(self._allocate_stack_slot(node.identifier))
             return node
-                
-        def check_instruction(instruction):
-            match instruction:
-                case AsmMov(src, dst):
-                    return AsmMov(remove_pseudos(src), remove_pseudos(dst))
-                case AsmUnary(unop, operand):
-                    return AsmUnary(unop, remove_pseudos(operand))
-                case AsmBinary(binop, src, dst):
-                    return AsmBinary(binop, remove_pseudos(src), remove_pseudos(dst))
-                case AsmCmp(operand1, operand2):
-                    return AsmCmp(remove_pseudos(operand1), remove_pseudos(operand2))
-                case AsmIdiv(src):
-                    return AsmIdiv(remove_pseudos(src))
-                case AsmSetCC(cond_code, operand):
-                    return AsmSetCC(cond_code, remove_pseudos(operand))
-                case AsmPush(operand):
-                    return AsmPush(remove_pseudos(operand))
-                case _:
-                    return instruction
+        
+        def check_instruction(instr):
+            new_attrs = {}
+            for attr, value in instr.__dict__.items():
+                new_attrs[attr] = remove_pseudos(value)
+            return type(instr)(**new_attrs)
         
         self.identifiers = {}
         self.stack_counter = 0
