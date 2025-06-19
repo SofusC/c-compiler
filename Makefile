@@ -6,9 +6,9 @@ ifndef chapter
 	$(error Missing chapter argument. Usage: make chapter-tests chapter=<num> [stage=<name>])
 endif
 ifeq ($(origin stage), undefined)
-	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter)
+	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter) --verbose
 else
-	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter) --stage $(stage)
+	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter) --stage $(stage) --verbose
 endif
 
 .PHONY: c-test

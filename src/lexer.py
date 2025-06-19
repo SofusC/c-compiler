@@ -14,6 +14,9 @@ class TokenType(Enum):
     BREAK               = r"break\b"
     CONTINUE            = r"continue\b"
 
+    STATIC              = r"static\b"
+    EXTERN              = r"extern\b"
+
     CONSTANT            = r"[0-9]+\b"
     IDENTIFIER          = r"[a-zA-Z_]\w*\b"
     OPEN_PAREN          = r"\("

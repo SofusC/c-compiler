@@ -6,6 +6,7 @@ from c_ast import *
 @dataclass
 class Parser:
     tokens: List[Token] #TODO: Should probably be a deque
+    specifiers = [TokenType.INT, TokenType.EXTERN, TokenType.STATIC]
     PRECEDENCE = {
         TokenType.ASTERISK:             50,
         TokenType.FORWARD_SLASH:        50,
@@ -133,9 +134,11 @@ class Parser:
         return None
     
     def parse_for_init(self):
-        if self.peek().token_type == TokenType.INT:
-            decl = self.parse_variable_declaration()
-            return InitDecl(decl)
+        if self.peek().token_type in self.specifiers:
+            decl = self.parse_declaration()
+            if isinstance(decl, FunDecl):
+                raise RuntimeError(f"Cannot have function declaration {decl} in for init")
+            return InitDecl(decl.variable_declaration)
         else:
             exp = self.parse_optional_exp(TokenType.SEMICOLON)
             self.expect(TokenType.SEMICOLON)
@@ -216,7 +219,7 @@ class Parser:
                 return Expression(exp)
     
     def parse_block_item(self) -> BlockItem:
-        if self.peek().token_type == TokenType.INT:
+        if self.peek().token_type in self.specifiers:
             return D(self.parse_declaration())
         else:
             return S(self.parse_statement())
@@ -243,18 +246,16 @@ class Parser:
             params.append(self.expect(TokenType.IDENTIFIER).value)
         return params
     
-    def parse_variable_declaration(self) -> VariableDeclaration:
-        self.expect(TokenType.INT)
+    def parse_variable_declaration(self, type, storage_class) -> VariableDeclaration:
         name = self.expect(TokenType.IDENTIFIER).value
         init = None
         if self.peek().token_type == TokenType.EQUAL_SIGN:
             self.advance()
             init = self.parse_exp()
         self.expect(TokenType.SEMICOLON)
-        return VariableDeclaration(name, init)
+        return VariableDeclaration(name, init, storage_class)
  
-    def parse_function_declaration(self) -> FunctionDeclaration:
-        self.expect(TokenType.INT)
+    def parse_function_declaration(self, type, storage_class) -> FunctionDeclaration:
         name = self.expect(TokenType.IDENTIFIER).value
         self.expect(TokenType.OPEN_PAREN)
         params = self.parse_param_list()
@@ -264,20 +265,46 @@ class Parser:
             body = self.parse_block()
         else:
             self.expect(TokenType.SEMICOLON)
-        return FunctionDeclaration(name, params, body)
+        return FunctionDeclaration(name, params, body, storage_class)
+    
+    def parse_type_and_storage_class(self):
+        types = []
+        storage_classes = []
+        while self.peek().token_type in self.specifiers:
+            token = self.expect(self.specifiers)
+            if token.token_type == TokenType.INT:
+                types.append(token)
+            else:
+                storage_classes.append(token)
+
+        if len(types) != 1:
+            raise RuntimeError(f"Invalid type specifier(s) {types}")
+        if len(storage_classes) > 1:
+            raise RuntimeError("Invalid storage class")
+        
+        type = Type.Int
+
+        if len(storage_classes) == 1:
+            token_type = storage_classes[0].token_type
+            if token_type == TokenType.EXTERN:
+                storage_class = StorageClass.extern
+            if token_type == TokenType.STATIC:
+                storage_class = StorageClass.static
+        else:
+            storage_class = None
+
+        return type, storage_class
     
     def parse_declaration(self) -> Declaration:
-        if self.tokens[2].token_type == TokenType.OPEN_PAREN:
-            return FunDecl(self.parse_function_declaration())
+        type, storage_class = self.parse_type_and_storage_class()
+        if self.tokens[1].token_type == TokenType.OPEN_PAREN:
+            return FunDecl(self.parse_function_declaration(type, storage_class))
         else:
-            return VarDecl(self.parse_variable_declaration())
+            return VarDecl(self.parse_variable_declaration(type, storage_class))
 
     def parse_program(self) -> Program:
-        functions = []
+        declarations = []
         while len(self.tokens) != 0:
-            functions.append(self.parse_function_declaration())
-        program = Program(functions)
-        if len(self.tokens) != 0:
-            raise RuntimeError(f"Syntax error, tokens left: {[token for token in self.tokens]}")
-        return program
+            declarations.append(self.parse_declaration())
+        return Program(declarations)
 

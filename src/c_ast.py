@@ -9,9 +9,15 @@ class ASTNode(ABC):
     pass
 
 
+
+class Type(Enum):
+    Int = auto()
+
+
+
 @dataclass
 class Program(ASTNode):
-    function_declarations: List[FunctionDeclaration]
+    declarations: List[Declaration]
 
 
 
@@ -32,12 +38,20 @@ class VarDecl(Declaration):
 class VariableDeclaration(ASTNode):
     name: str
     init: Exp | None
+    storage_class: StorageClass | None
 
 @dataclass
 class FunctionDeclaration(ASTNode):
     name: str
     params: List[str]
     body: Block | None
+    storage_class: StorageClass | None
+
+
+
+class StorageClass(Enum):
+    static = auto()
+    extern = auto()
 
 
 
