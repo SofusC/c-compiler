@@ -1,5 +1,5 @@
-from ir_ast import *
-from assembly_ast import *
+from .ir_ast import *
+from .assembly_ast import *
 
 _RELATIONAL_MAP = {
     IRBinaryOperator.Equal          : AsmCondCode.E,

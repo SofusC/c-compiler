@@ -1,11 +1,11 @@
-import lexer
-import parser
-import emitter
-import asm_generator
-import asm_allocator
-import code_emitter
-import pretty_printer
-import semantic_analyser
+from . import pretty_printer
+from . import lexer
+from . import parser
+from . import emitter
+from . import asm_generator
+from . import asm_allocator
+from . import code_emitter
+from .semantic_analysis.semantic_analyser import validate_program
 
 def compile_c(file, flag):
     output = None
@@ -14,7 +14,7 @@ def compile_c(file, flag):
         ast = parser.Parser(tokens).parse_program()
 
     if flag in ["validate", "tacky", "codegen", "all", "testall", "c"]:
-        analysed_ast = semantic_analyser.validate_program(ast)
+        analysed_ast = validate_program(ast)
 
     if flag in ["tacky", "codegen", "all", "testall", "c"]:
         emitted_ir = emitter.IREmitter().emit_program(analysed_ast)

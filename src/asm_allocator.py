@@ -1,4 +1,4 @@
-from assembly_ast import *
+from .assembly_ast import *
 
 TMP_REG_1 = AsmReg(AsmRegs.R10)
 TMP_REG_2 = AsmReg(AsmRegs.R11)

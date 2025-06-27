@@ -1,7 +1,7 @@
-from lexer import TokenType, Token
+from .lexer import TokenType, Token
 from dataclasses import dataclass
 from typing import List, Iterable
-from c_ast import *
+from .c_ast import *
 
 @dataclass
 class Parser:

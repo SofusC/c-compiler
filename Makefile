@@ -6,15 +6,15 @@ ifndef chapter
 	$(error Missing chapter argument. Usage: make chapter-tests chapter=<num> [stage=<name>])
 endif
 ifeq ($(origin stage), undefined)
-	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter) --verbose
+	./writing-a-c-compiler-tests/test_compiler run.sh --chapter $(chapter) --verbose
 else
-	./writing-a-c-compiler-tests/test_compiler src/compiler_driver --chapter $(chapter) --stage $(stage) --verbose
+	./writing-a-c-compiler-tests/test_compiler run.sh --chapter $(chapter) --stage $(stage) --verbose
 endif
 
 .PHONY: c-test
 
 c-test:
-	./src/compiler_driver --$(stage) ./tests/test.c
+	run.sh --$(stage) ./tests/test.c
 
 .PHONY: tests
 

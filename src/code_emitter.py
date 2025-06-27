@@ -1,5 +1,5 @@
-from assembly_ast import *
-from semantic_analyser import symbol_table
+from .assembly_ast import *
+from .semantic_analysis.typechecker import symbol_table
 
 def emit_program_code(program):
     res = []

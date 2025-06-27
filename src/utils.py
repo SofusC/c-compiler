@@ -45,3 +45,25 @@ def log(arg = None):
         return decorator(arg)
     else:
         return decorator
+    
+
+class NameGenerator:
+    _counter = 0
+
+    @classmethod
+    @log
+    def _next_id(cls):
+        val = cls._counter
+        cls._counter += 1
+        return val
+    
+    @classmethod
+    @log
+    def make_temporary(cls, name = "tmp"):
+        unique_name = f"{name}.{cls._next_id()}"
+        return unique_name
+    
+    @classmethod
+    @log
+    def make_label(cls, label_name):
+        return f"{label_name}{cls._next_id()}"

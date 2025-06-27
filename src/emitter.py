@@ -1,6 +1,6 @@
-from ir_ast import *
-from c_ast import *
-from semantic_analyser import NameGenerator
+from .ir_ast import *
+from .c_ast import *
+from .utils import NameGenerator
 from copy import deepcopy
 
 class IREmitter:

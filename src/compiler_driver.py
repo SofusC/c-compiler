@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 import subprocess
 import sys
-import compiler
+from . import compiler
 
 def preprocess(file):
     output_file = file[:-2] + ".i"
