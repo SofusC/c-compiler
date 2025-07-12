@@ -9,14 +9,27 @@ class TackyNode(ABC):
 
 @dataclass
 class IRProgram(TackyNode):
-    functions: List[IRFunctionDefinition]
+    toplevels: List[IRTopLevel]
+
+
+
+class IRTopLevel(TackyNode):
+    pass
 
 @dataclass
-class IRFunctionDefinition(TackyNode):
+class IRFunctionDefinition(IRTopLevel):
     name: str
+    global_: bool
     params: List[str]
     body: List[IRInstruction]
-    
+
+@dataclass
+class StaticVariable(IRTopLevel):
+    name: str
+    global_: bool
+    init: int
+
+
 
 class IRInstruction(TackyNode):
     pass

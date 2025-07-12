@@ -2,6 +2,8 @@ from .ir_ast import *
 from .c_ast import *
 from .utils import NameGenerator
 from copy import deepcopy
+from typing import Any, List, Optional
+from .semantic_analysis.typechecker import symbol_table, StaticAttr, Initial, Tentative, NoInitializer
 
 class IREmitter:
     instructions = [] # TODO: Remove?
@@ -25,26 +27,26 @@ class IREmitter:
         BinaryOperator.GreaterOrEqual: IRBinaryOperator.GreaterOrEqual,
     }
     
-    def emit_binary_operator(self, ast_node):
+    def emit_binary_operator(self, ast_node: BinaryOperator) -> IRBinaryOperator:
         try:
             return self.binop_map[ast_node]
         except KeyError:
             raise RuntimeError(f"Binary operator {ast_node} not implemented")
 
-    def emit_unary_operator(self, ast_node):
+    def emit_unary_operator(self, ast_node: UnaryOperator) -> IRUnaryOperator:
         try:
             return self.unop_map[ast_node]
         except KeyError:
             raise RuntimeError(f"Unary operator {ast_node} not implemented")
     
-    def emit_unary_instructions(self, unop, exp):
+    def emit_unary_instructions(self, unop: UnaryOperator, exp: Exp) -> IRVar:
         src = self.emit_exp(exp)
         dst = IRVar(NameGenerator.make_temporary())
         tacky_op = self.emit_unary_operator(unop)
         self.instructions.append(IRUnary(tacky_op,src,dst))
         return dst
     
-    def emit_short_circuit_instructions(self, binop, e1, e2):
+    def emit_short_circuit_instructions(self, binop: BinaryOperator, e1: Exp, e2: Exp) -> IRVar:
         if binop == BinaryOperator.And:
             short_circuit_value = 0
             jump_instr = IRJumpIfZero
@@ -75,7 +77,7 @@ class IREmitter:
 
         return result
       
-    def emit_binary_instructions(self, binop, e1, e2):
+    def emit_binary_instructions(self, binop: BinaryOperator, e1: Exp, e2: Exp) -> IRVar:
         v1 = self.emit_exp(e1)
         v2 = self.emit_exp(e2)
         dst = IRVar(NameGenerator.make_temporary())
@@ -83,13 +85,13 @@ class IREmitter:
         self.instructions.append(IRBinary(tacky_op, v1, v2, dst))
         return dst
     
-    def emit_function_call(self, identifier, args):
+    def emit_function_call(self, identifier: str, args: List[Exp]) -> IRVar:
         new_args = [self.emit_exp(arg) for arg in args]
         result = IRVar(NameGenerator.make_temporary())
         self.instructions.append(IRFunCall(identifier, new_args, result))
         return result
             
-    def emit_exp(self, ast_node):
+    def emit_exp(self, ast_node: Exp) -> IRVal:
         match ast_node:
             case Constant(constant):
                 return IRConstant(constant)
@@ -113,7 +115,7 @@ class IREmitter:
             case _:
                 raise RuntimeError(f"Expression {ast_node} not implemented")
             
-    def emit_conditional(self, cond, then, else_):
+    def emit_conditional(self, cond: Exp, then: Exp, else_: Exp) -> IRVar:
         # Evaluate condition
         cond_val = self.emit_exp(cond)
         cond_tmp = IRVar(NameGenerator.make_temporary())
@@ -144,7 +146,7 @@ class IREmitter:
         self.instructions.append(IRLabel(end_label))
         return result
     
-    def emit_if(self, cond, then, else_):
+    def emit_if(self, cond: Exp, then: Statement, else_: Optional[Statement]) -> None:
         # Evaluate condition
         cond_val = self.emit_exp(cond)
         cond_tmp = IRVar(NameGenerator.make_temporary())
@@ -166,7 +168,7 @@ class IREmitter:
 
         self.instructions.append(IRLabel(end_label))  
 
-    def emit_for_init(self, for_init):
+    def emit_for_init(self, for_init: ForInit) -> Optional[Any]: # TODO: return none?
         match for_init:
             case InitDecl(decl):
                 return self.emit_variable_declaration(decl)
@@ -177,7 +179,7 @@ class IREmitter:
             case _:
                 raise RuntimeError(f"ForInit {for_init} not implemented")
     
-    def emit_conditional_jump(self, cond, jump_label, invert=False):
+    def emit_conditional_jump(self, cond: Exp, jump_label: str, invert: bool = False) -> None:
         result = self.emit_exp(cond)
         v = IRVar(NameGenerator.make_temporary())
         self.instructions.append(IRCopy(result, v))
@@ -186,14 +188,14 @@ class IREmitter:
         else:
             self.instructions.append(IRJumpIfZero(v, jump_label))
 
-    def make_loop_labels(self, label):
+    def make_loop_labels(self, label: str) -> tuple[IRLabel, IRLabel, IRLabel]:
         return (
             IRLabel(f"start_{label}"),
             IRLabel(f"continue_{label}"),
             IRLabel(f"break_{label}")
         )
 
-    def emit_loop(self, loop):
+    def emit_loop(self, loop: While | DoWhile | For) -> None:
         match loop:
             case While(cond, body, label):
                 _, continue_, break_ = self.make_loop_labels(label)
@@ -222,24 +224,17 @@ class IREmitter:
                 self.instructions.append(IRJump(f"start_{label}"))
                 self.instructions.append(break_)
 
-    def emit_variable_declaration(self, decl: VariableDeclaration):
+    def emit_variable_declaration(self, decl: VariableDeclaration) -> Optional[IRVar]:
+        if decl.storage_class is not None:
+            return None
         if decl.init is None:
-            return
+            return None
         result = self.emit_exp(decl.init)
         lhs = IRVar(decl.name)
         self.instructions.append(IRCopy(result, lhs))
         return lhs
             
-    def emit_declaration(self, decl):
-        match decl:
-            case FunDecl(fun_decl):
-                self.emit_function_declaration(fun_decl)
-            case VarDecl(var_decl):
-                self.emit_variable_declaration(var_decl)
-            case _:
-                raise RuntimeError(f"Declaration {decl} not implemented")
-
-    def emit_statement(self, statement):
+    def emit_statement(self, statement: Statement) -> None:
         match statement:
             case Return(exp):
                 ret = self.emit_exp(exp)
@@ -260,8 +255,17 @@ class IREmitter:
                 pass
             case _:
                 raise RuntimeError(f"Statement {statement} not implemented")
+    
+    def emit_declaration(self, decl: Declaration) -> None:
+        match decl:
+            case FunDecl(fun_decl):
+                self.emit_function_declaration(fun_decl)
+            case VarDecl(var_decl):
+                self.emit_variable_declaration(var_decl)
+            case _:
+                raise RuntimeError(f"Declaration {decl} not implemented")
 
-    def emit_block_item(self, item):
+    def emit_block_item(self, item: BlockItem) -> None:
         match item:
             case D(declaration):
                 self.emit_declaration(declaration)
@@ -270,19 +274,46 @@ class IREmitter:
             case _:
                 raise RuntimeError(f"BlockItem {item} not implemented")
 
-    def emit_block(self, block: Block):
+    def emit_block(self, block: Block):# -> List[IRInstruction]:
         for block_item in block.block_items:
             self.emit_block_item(block_item)
-        return self.instructions
+        #return self.instructions
     
-    def emit_function_declaration(self, function_declaration: FunctionDeclaration):
-        if function_declaration.body is None:
+    def emit_function_declaration(self, fun_decl: FunctionDeclaration) -> Optional[IRFunctionDefinition]:
+        if fun_decl.body is None:
             return
-        self.instructions = []
-        instructions = self.emit_block(function_declaration.body)
-        instructions.append(IRReturn(IRConstant(0)))
-        return IRFunctionDefinition(function_declaration.name, function_declaration.params, deepcopy(instructions))
-    
-    def emit_program(self, program):
-        functions = [func_decl for func in program.function_declarations if (func_decl := self.emit_function_declaration(func)) is not None]
-        return IRProgram(functions)
+        self.instructions = [] #TODO: Unclass, and use global variable?
+        self.emit_block(fun_decl.body)
+        self.instructions.append(IRReturn(IRConstant(0)))
+        global_ = symbol_table[fun_decl.name].attrs.global_
+        return IRFunctionDefinition(fun_decl.name, global_, fun_decl.params, deepcopy(self.instructions))
+
+    def emit_toplevel(self, decl: Declaration) -> Optional[IRFunctionDefinition]:
+        match decl:
+            case FunDecl(fun_decl):
+                return self.emit_function_declaration(fun_decl)
+            case VarDecl():
+                return None
+            case _:
+                raise RuntimeError(f"Declaration {decl} not implemented")
+            
+    def convert_symbols_to_tacky(self): #TODO: refactor
+        tacky_defs = []
+        for name, entry in symbol_table.items():
+            match entry.attrs:
+                case StaticAttr(init, global_):
+                    match init:
+                        case Initial(value):
+                            tacky_defs.append(StaticVariable(name, global_, value))
+                        case Tentative():
+                            tacky_defs.append(StaticVariable(name, global_, 0))
+                        case NoInitializer():
+                            continue
+                case _:
+                    continue
+        return tacky_defs
+
+    def emit_program(self, program: Program) -> IRProgram:
+        toplevels = [toplevel for decl in program.declarations if (toplevel := self.emit_toplevel(decl)) is not None]
+        toplevels.extend(self.convert_symbols_to_tacky())
+        return IRProgram(toplevels)

@@ -20,6 +20,7 @@ class ColorFormatter(logging.Formatter):
 handler = logging.StreamHandler()
 formatter = ColorFormatter('%(levelname)s : %(message)s')
 handler.setFormatter(formatter)
+#TODO: Make the debugging level configurable
 logging.basicConfig(level=logging.DEBUG, handlers=[handler])
 
 def log(arg = None):
