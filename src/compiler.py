@@ -17,7 +17,7 @@ def compile_c(file, flag):
         analysed_ast = validate_program(ast)
 
     if flag in ["tacky", "codegen", "all", "testall", "c"]:
-        emitted_ir = emitter.IREmitter().emit_program(analysed_ast)
+        emitted_ir = emitter.emit_program(analysed_ast)
 
     if flag in ["codegen", "all", "testall", "c"]:
         asm = asm_generator.lower_program(emitted_ir)
