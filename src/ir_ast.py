@@ -24,7 +24,7 @@ class IRFunctionDefinition(IRTopLevel):
     body: List[IRInstruction]
 
 @dataclass
-class StaticVariable(IRTopLevel):
+class IRStaticVariable(IRTopLevel):
     name: str
     global_: bool
     init: int

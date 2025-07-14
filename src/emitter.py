@@ -304,15 +304,17 @@ class IREmitter:
                 case StaticAttr(init, global_):
                     match init:
                         case Initial(value):
-                            tacky_defs.append(StaticVariable(name, global_, value))
+                            tacky_defs.append(IRStaticVariable(name, global_, value))
                         case Tentative():
-                            tacky_defs.append(StaticVariable(name, global_, 0))
+                            tacky_defs.append(IRStaticVariable(name, global_, 0))
                         case NoInitializer():
                             continue
                 case _:
                     continue
         return tacky_defs
 
+    #TODO: Move this method to top of file, and so on with the other methods
+    #TODO: Add logging?
     def emit_program(self, program: Program) -> IRProgram:
         toplevels = [toplevel for decl in program.declarations if (toplevel := self.emit_toplevel(decl)) is not None]
         toplevels.extend(self.convert_symbols_to_tacky())

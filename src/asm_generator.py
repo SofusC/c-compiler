@@ -19,8 +19,17 @@ _OPERATOR_MAP = {
 }
         
 def lower_program(program: IRProgram):
-    functions = [lower_function_definition(function) for function in program.functions]
-    return AsmProgram(functions)
+    toplevels = [lower_toplevel(toplevel) for toplevel in program.toplevels]
+    return AsmProgram(toplevels)
+
+def lower_toplevel(toplevel: IRTopLevel):
+    match toplevel:
+        case IRFunctionDefinition():
+            return lower_function_definition(toplevel)
+        case IRStaticVariable(name, global_, init):
+            return AsmStaticVar(name, global_, init)
+        case _:
+            raise NotImplementedError(f"Top-level object {toplevel} cannot be transformed to assembly AST yet.")
 
 def lower_function_definition(func_def: IRFunctionDefinition):
     param_regs = AsmRegs.system_v_argument_regs()
@@ -32,7 +41,7 @@ def lower_function_definition(func_def: IRFunctionDefinition):
         
     for instruction in func_def.body:
         asm_instructions += lower_instr(instruction)
-    return AsmFunctionDef(func_def.name, asm_instructions)
+    return AsmFunctionDef(func_def.name, func_def.global_, asm_instructions)
 
 def lower_instr(ast_node):
     match ast_node:

@@ -5,12 +5,24 @@ from typing import List
 
 @dataclass
 class AsmProgram():
-    function_definitions: List[AsmFunctionDef]
+    top_levels: List[AsmTopLevel]
+
+
+
+class AsmTopLevel():
+    pass
 
 @dataclass
-class AsmFunctionDef():
+class AsmFunctionDef(AsmTopLevel):
     name: str
+    global_: bool
     instructions: List[AsmInstruction]
+
+@dataclass
+class AsmStaticVar(AsmTopLevel):
+    name: str
+    global_: bool
+    init: int
 
 
 
@@ -113,6 +125,11 @@ class AsmPseudo(AsmOperand):
 @dataclass
 class AsmStack(AsmOperand):
     int: int
+
+@dataclass
+class AsmData(AsmOperand):
+    identifier: str
+
 
 
 class AsmCondCode(Enum):
