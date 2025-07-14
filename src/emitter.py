@@ -300,6 +300,7 @@ class IREmitter:
     def convert_symbols_to_tacky(self): #TODO: refactor
         tacky_defs = []
         for name, entry in symbol_table.items():
+            print(f"{name}: {entry}")
             match entry.attrs:
                 case StaticAttr(init, global_):
                     match init:

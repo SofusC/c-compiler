@@ -1,6 +1,6 @@
 from .assembly_ast import *
-from .semantic_analysis.typechecker import symbol_table
-from typing import List, Dict, Any
+from .semantic_analysis.typechecker import symbol_table, StaticAttr
+from typing import List, Dict
 
 TMP_REG_1 = AsmReg(AsmRegs.R10)
 TMP_REG_2 = AsmReg(AsmRegs.R11)
@@ -63,7 +63,7 @@ class AsmAllocator():
         #TODO: Refactor
         if identifier not in self.identifiers:
             if identifier in symbol_table:
-                if getattr(symbol_table[identifier].attrs, "global_", False):
+                if isinstance(symbol_table[identifier].attrs, StaticAttr):
                     return AsmData(identifier)
             self.stack_counter -= INT_SIZE
             self.identifiers[identifier] = self.stack_counter

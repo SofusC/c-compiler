@@ -1,24 +1,51 @@
 from .assembly_ast import *
 from .semantic_analysis.typechecker import symbol_table
+from .asm_allocator import INT_SIZE
 
 def emit_program_code(program):
     res = []
-    for function in program.function_definitions:
-        res.extend(emit_function(function.name, function.instructions))
+    for top_level in program.top_levels:
+        if isinstance(top_level, AsmFunctionDef):
+            res.extend(emit_function(top_level))
+        elif isinstance(top_level, AsmStaticVar):
+            res.extend(emit_static_var(top_level))
+        else:
+            raise NotImplementedError(f"Can't generate assembly code for {top_level}")
+        res.append("")
     res.append('   .section .note.GNU-stack,"",@progbits')
     return "\n".join(res) + "\n"
 
-def emit_function(name, instructions):
-    res = [f"   .globl {name}",
-           f"{name}:",
-           f"   pushq  %rbp",
-           f"   movq   %rsp, %rbp"]
-    for instr in instructions:
+def emit_function(func_def):
+    res = []
+    if func_def.global_:
+        res.append(f"   .globl {func_def.name}")
+    res.extend([
+        f"   .text",
+        f"{func_def.name}:",
+        f"   pushq  %rbp",
+        f"   movq   %rsp, %rbp"])
+    for instr in func_def.instructions:
         lines = emit_instruction(instr)
         if isinstance(lines, list):
             res.extend("   " + line for line in lines)
         else:
             res.append("   " + lines)
+    return res
+
+def emit_static_var(static_var):
+    res = []
+    if static_var.global_:
+        res.append(f"   .globl {static_var.name}")
+    if static_var.init != 0:
+        res.append(f"   .data")
+    else:
+        res.append(f"   .bss")
+    res.append(f"   .align 4")
+    res.append(f"{static_var.name}:")
+    if static_var.init != 0:
+        res.append(f"   .long {static_var.init}")
+    else:
+        res.append(f"   .zero {INT_SIZE}")
     return res
         
 def emit_instruction(ast_node):
@@ -72,6 +99,8 @@ def emit_operand(operand, size = "dword"):
                 return reg.as_qword()
         case AsmStack(offset):
             return f"{offset}(%rbp)"
+        case AsmData(name):
+            return f"{name}(%rip)"
         case AsmImm(int):
             return f"${int}"
         case _:

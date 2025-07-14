@@ -1,4 +1,8 @@
 
+ifdef failfast
+	FAILFAST_FLAG := --failfast
+endif
+
 .PHONY: chapter-tests
 
 chapter-tests:
@@ -6,9 +10,9 @@ ifndef chapter
 	$(error Missing chapter argument. Usage: make chapter-tests chapter=<num> [stage=<name>])
 endif
 ifeq ($(origin stage), undefined)
-	./writing-a-c-compiler-tests/test_compiler run.sh --chapter $(chapter) --verbose
+	./writing-a-c-compiler-tests/test_compiler run.sh --chapter $(chapter) --verbose $(FAILFAST_FLAG)
 else
-	./writing-a-c-compiler-tests/test_compiler run.sh --chapter $(chapter) --stage $(stage) --verbose
+	./writing-a-c-compiler-tests/test_compiler run.sh --chapter $(chapter) --stage $(stage) --verbose $(FAILFAST_FLAG)
 endif
 
 .PHONY: c-test

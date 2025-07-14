@@ -89,7 +89,7 @@ def typecheck_function_declaration(decl: FunctionDeclaration):
 @log
 def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
     if isinstance(var_decl.init, Constant):
-        initial_value = Initial(var_decl.init)
+        initial_value = Initial(var_decl.init.constant)
     elif var_decl.init is None:
         if var_decl.storage_class == StorageClass.extern:
             initial_value = NoInitializer()
@@ -162,7 +162,7 @@ def typecheck_local_variable_declaration(var_decl: VariableDeclaration):
             )
     elif var_decl.storage_class == StorageClass.static:
         if isinstance(var_decl.init, Constant):
-            initial_value = var_decl.init
+            initial_value = Initial(var_decl.init.constant)
         elif var_decl.init is None:
             initial_value = Initial(0)
         else:
