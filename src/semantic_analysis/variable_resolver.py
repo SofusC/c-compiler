@@ -103,30 +103,16 @@ def resolve_block(block, identifier_map):
         new_block_items.append(resolved)
     return Block(new_block_items)
 
-#TODO: Move into resolve_param function?
 @log
-def register_identifier(name, identifier_map):
-    if name in identifier_map and identifier_map[name].from_current_scope:
+def resolve_param(param, identifier_map):
+    if param in identifier_map and identifier_map[param].from_current_scope:
         raise RuntimeError("Duplicate variable declaration")
-    unique_name = NameGenerator.make_temporary(name)
-    identifier_map[name] = MapEntry(
+    unique_name = NameGenerator.make_temporary(param)
+    identifier_map[param] = MapEntry(
         name = unique_name, 
         from_current_scope = True, 
         has_linkage = False)
     return unique_name
-
-#@log
-#def resolve_variable_declaration(var_decl, identifier_map):
-#    name = var_decl.name
-#    unique_name = register_identifier(name, identifier_map)
-#    init = var_decl.init
-#    if init is not None:
-#        init = resolve_exp(init, identifier_map)
-#    return VariableDeclaration(unique_name, init)
-
-@log
-def resolve_param(param, identifier_map):
-    return register_identifier(param, identifier_map)
 
 @log
 def resolve_local_function_declaration(func_decl, identifier_map):

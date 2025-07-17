@@ -5,12 +5,12 @@ from copy import deepcopy
 from typing import Any, List, Optional
 from .semantic_analysis.typechecker import symbol_table, StaticAttr, Initial, Tentative, NoInitializer
 
-unop_map = {
+_UNOP_MAP = {
     UnaryOperator.Complement     : IRUnaryOperator.Complement,
     UnaryOperator.Negate         : IRUnaryOperator.Negate,
     UnaryOperator.Not            : IRUnaryOperator.Not,
 }
-binop_map = {
+_BINOP_MAP = {
     BinaryOperator.Add           : IRBinaryOperator.Add,
     BinaryOperator.Subtract      : IRBinaryOperator.Subtract,
     BinaryOperator.Multiply      : IRBinaryOperator.Multiply,
@@ -26,13 +26,13 @@ binop_map = {
 
 def emit_binary_operator(ast_node: BinaryOperator) -> IRBinaryOperator:
     try:
-        return binop_map[ast_node]
+        return _BINOP_MAP[ast_node]
     except KeyError:
         raise RuntimeError(f"Binary operator {ast_node} not implemented")
 
 def emit_unary_operator(ast_node: UnaryOperator) -> IRUnaryOperator:
     try:
-        return unop_map[ast_node]
+        return _UNOP_MAP[ast_node]
     except KeyError:
         raise RuntimeError(f"Unary operator {ast_node} not implemented")
 
@@ -293,20 +293,24 @@ def emit_toplevel(decl: Declaration) -> Optional[IRFunctionDefinition]:
         case _:
             raise RuntimeError(f"Declaration {decl} not implemented")
         
-def convert_symbols_to_tacky(): #TODO: refactor
+def convert_symbols_to_tacky():
     tacky_defs = []
     for name, entry in symbol_table.items():
-        match entry.attrs:
-            case StaticAttr(init, global_):
-                match init:
-                    case Initial(value):
-                        tacky_defs.append(IRStaticVariable(name, global_, value))
-                    case Tentative():
-                        tacky_defs.append(IRStaticVariable(name, global_, 0))
-                    case NoInitializer():
-                        continue
-            case _:
+        attrs = entry.attrs
+        if not isinstance(attrs, StaticAttr):
+            continue
+
+        init, is_global = attrs.init, attrs.global_
+
+        match init:
+            case Initial(value):
+                value = value
+            case Tentative():
+                value = 0
+            case NoInitializer():
                 continue
+
+        tacky_defs.append(IRStaticVariable(name, is_global, value))
     return tacky_defs
 
 #TODO: Move this method to top of file, and so on with the other methods

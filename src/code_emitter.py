@@ -36,16 +36,15 @@ def emit_static_var(static_var):
     res = []
     if static_var.global_:
         res.append(f"   .globl {static_var.name}")
-    if static_var.init != 0:
-        res.append(f"   .data")
-    else:
-        res.append(f"   .bss")
+        
+    section = ".data" if static_var.init != 0 else ".bss"
+    res.append(f"   {section}")
+
     res.append(f"   .align 4")
     res.append(f"{static_var.name}:")
-    if static_var.init != 0:
-        res.append(f"   .long {static_var.init}")
-    else:
-        res.append(f"   .zero {INT_SIZE}")
+    
+    init_line = f"   .long {static_var.init}" if static_var.init != 0 else f"   .zero {INT_SIZE}"
+    res.append(init_line)
     return res
         
 def emit_instruction(ast_node):

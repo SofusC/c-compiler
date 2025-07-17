@@ -59,34 +59,36 @@ class AsmAllocator():
         size += STACK_ALIGNMENT - (size % STACK_ALIGNMENT)
         fn_def.instructions.insert(0, AsmAllocateStack(size))
 
-    def _allocate_stack_slot(self, identifier: str) -> AsmOperand:
-        #TODO: Refactor
-        if identifier not in self.identifiers:
-            if identifier in symbol_table:
-                if isinstance(symbol_table[identifier].attrs, StaticAttr):
-                    return AsmData(identifier)
-            self.stack_counter -= INT_SIZE
-            self.identifiers[identifier] = self.stack_counter
-        return AsmStack(self.identifiers[identifier])
+    def _allocate_stack_slot(self, identifier: str) -> AsmOperand: #TODO: Rename
+        if identifier in self.identifiers:
+            return AsmStack(self.identifiers[identifier])
 
+        if identifier in symbol_table:
+            if isinstance(symbol_table[identifier].attrs, StaticAttr):
+                return AsmData(identifier)
+
+        self.stack_counter -= INT_SIZE
+        self.identifiers[identifier] = self.stack_counter
+        return AsmStack(self.stack_counter)
+
+    def _remove_pseudos(self, node: AsmOperand) -> AsmOperand:
+        if isinstance(node, AsmPseudo):
+            return self._allocate_stack_slot(node.identifier)
+        return node
+
+    def _check_instruction(self, instr: AsmInstruction) -> AsmInstruction:
+        new_attrs = {}
+        for attr, value in instr.__dict__.items():
+            new_attrs[attr] = self._remove_pseudos(value)
+        return type(instr)(**new_attrs)
+    
     def lower_pseudo_regs(self, function_definition: AsmFunctionDef) -> None:
         """
         Replaces pseudo-registers with locations on the stack.
-        """
-        def remove_pseudos(node: AsmOperand) -> AsmOperand: #TODO: Move these out of method
-            if isinstance(node, AsmPseudo):
-                return self._allocate_stack_slot(node.identifier)
-            return node
-        
-        def check_instruction(instr: AsmInstruction) -> AsmInstruction:
-            new_attrs = {}
-            for attr, value in instr.__dict__.items():
-                new_attrs[attr] = remove_pseudos(value)
-            return type(instr)(**new_attrs)
-        
+        """        
         self.identifiers: Dict[str, int] = {}
         self.stack_counter: int = 0
-        function_definition.instructions = [check_instruction(instr) for instr in function_definition.instructions]
+        function_definition.instructions = [self._check_instruction(instr) for instr in function_definition.instructions]
     
     def legalize(self, program: AsmProgram) -> None:
         for toplevel in program.top_levels:
