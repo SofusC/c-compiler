@@ -16,6 +16,137 @@ def copy_identifier_map(identifier_map):
     return result
 
 @log
+def register_function_decl(func_decl, identifier_map):
+    if func_decl.name in identifier_map:
+        prev_entry = identifier_map[func_decl.name]
+        if prev_entry.from_current_scope and not prev_entry.has_linkage:
+            raise RuntimeError("Duplicate declaration")
+
+    identifier_map[func_decl.name] = MapEntry(
+        name = func_decl.name,
+        from_current_scope = True,
+        has_linkage = True
+    )
+
+@log
+def register_file_scope_variable_decl(var_decl, identifier_map):
+    identifier_map[var_decl.name] = MapEntry(
+        name = var_decl.name,
+        from_current_scope = True,
+        has_linkage = True
+    )
+
+@log
+def register_local_variable_decl(var_decl, identifier_map):
+    name = var_decl.name
+    if name in identifier_map:
+        prev_entry = identifier_map[name]
+        if prev_entry.from_current_scope:
+            if not (prev_entry.has_linkage and var_decl.storage_class == StorageClass.extern):
+                raise RuntimeError(f"Conflicting local declarations {var_decl} and {prev_entry}")
+
+    if var_decl.storage_class == StorageClass.extern:
+        identifier_map[name] = MapEntry(
+            name = name,
+            from_current_scope = True,
+            has_linkage = True
+        )
+        return name
+
+    unique_name = NameGenerator.make_temporary(name)
+    identifier_map[name] = MapEntry(
+        name = unique_name,
+        from_current_scope = True,
+        has_linkage = False
+    )
+    return unique_name
+
+@log
+def resolve_function_call(identifier_map, fun_name):
+    if fun_name not in identifier_map:
+        raise RuntimeError(f"Undeclared function {fun_name}")
+    new_fun_name = identifier_map[fun_name].name
+    return new_fun_name
+
+@log
+def resolve_variable_name(var_name, identifier_map):
+    if var_name not in identifier_map:
+        raise RuntimeError(f"Undeclared variable {var_name}")
+    return identifier_map[var_name].name
+
+@log
+def register_param(param, identifier_map):
+    if param in identifier_map and identifier_map[param].from_current_scope:
+        raise RuntimeError("Duplicate variable declaration")
+    unique_name = NameGenerator.make_temporary(param)
+    identifier_map[param] = MapEntry(
+        name = unique_name, 
+        from_current_scope = True, 
+        has_linkage = False)
+    return unique_name
+
+@log
+def check_local_function_decl(function_declaration):
+    if function_declaration.body is not None:
+        raise RuntimeError(f"Local function definition {function_declaration} cannot have a body")
+    if function_declaration.storage_class == StorageClass.static:
+        raise RuntimeError(f"Local function declaration {function_declaration} cannot include static specifier")
+    
+@log
+def check_assignment_lvalue(left):
+    if not isinstance(left, Var):
+        raise RuntimeError("Invalid lvalue")
+
+
+
+
+
+@log
+def resolve_function_declaration(func_decl, identifier_map):
+    register_function_decl(func_decl, identifier_map)
+
+    inner_map = copy_identifier_map(identifier_map)
+    new_params = [register_param(param, inner_map) for param in func_decl.params]
+    
+    new_body = None
+    if func_decl.body is not None:
+        new_body = resolve_block(func_decl.body, inner_map)
+    return FunctionDeclaration(func_decl.name, new_params, new_body, func_decl.storage_class)
+     
+@log
+def resolve_local_variable_declaration(var_decl: VariableDeclaration, identifier_map):
+    new_name = register_local_variable_decl(var_decl, identifier_map)
+    init = var_decl.init
+    if init is not None:
+        init = resolve_exp(init, identifier_map)
+    return VariableDeclaration(new_name, init, var_decl.storage_class)
+
+@log
+def resolve_exp(exp, identifier_map):
+    match exp:
+        case Assignment(left, right):
+            check_assignment_lvalue(left)
+            return Assignment(resolve_exp(left, identifier_map), resolve_exp(right, identifier_map))
+        case Var(v):
+            return Var(resolve_variable_name(v, identifier_map))
+        case Constant():
+            return exp
+        case Unary(unop, exp):
+            return Unary(unop, resolve_exp(exp, identifier_map))
+        case Binary(binop, left, right):
+            return Binary(binop, resolve_exp(left, identifier_map), resolve_exp(right, identifier_map))
+        case Conditional(cond, then, else_):
+            return Conditional(resolve_exp(cond, identifier_map), 
+                                resolve_exp(then, identifier_map), 
+                                resolve_exp(else_, identifier_map))
+        case FunctionCall(fun_name, args):
+            new_fun_name = resolve_function_call(identifier_map, fun_name)
+            new_args = [resolve_exp(arg, identifier_map) for arg in args]
+            return FunctionCall(new_fun_name, new_args)
+        case _:
+            raise RuntimeError(f"Could not validate semantics for expression {exp}")
+
+@log
 def resolve_for_init(init, identifier_map):
     match init:
         case InitDecl(decl):
@@ -58,147 +189,42 @@ def resolve_statement(statement, identifier_map):
             return Null()
         case _:
             raise RuntimeError(f"Could not validate semantics for statement {statement}")
-
-@log
-def resolve_exp(exp, identifier_map):
-    match exp:
-        case Assignment(left, right):
-            if not isinstance(left, Var):
-                raise RuntimeError("Invalid lvalue")
-            return Assignment(resolve_exp(left, identifier_map), resolve_exp(right, identifier_map))
-        case Var(v):
-            if v not in identifier_map:
-                raise RuntimeError(f"Undeclared variable {v}")
-            return Var(identifier_map[v].name)
-        case Constant(_):
-            return exp
-        case Unary(unop, exp):
-            return Unary(unop, resolve_exp(exp, identifier_map))
-        case Binary(binop, left, right):
-            return Binary(binop, resolve_exp(left, identifier_map), resolve_exp(right, identifier_map))
-        case Conditional(cond, then, else_):
-            return Conditional(resolve_exp(cond, identifier_map), 
-                                resolve_exp(then, identifier_map), 
-                                resolve_exp(else_, identifier_map))
-        case FunctionCall(fun_name, args):
-            if fun_name not in identifier_map:
-                raise RuntimeError(f"Undeclared function {fun_name}")
-            new_fun_name = identifier_map[fun_name].name
-            new_args = [resolve_exp(arg, identifier_map) for arg in args]
-            return FunctionCall(new_fun_name, new_args)
-        case _:
-            raise RuntimeError(f"Could not validate semantics for expression {exp}")
-
 @log
 def resolve_block(block, identifier_map):
-    new_block_items = []
-    for blockitem in block.block_items:
-        match blockitem:
-            case D(declaration):
-                resolved = D(resolve_local_declaration(declaration, identifier_map))
-            case S(statement):
-                resolved = S(resolve_statement(statement, identifier_map))
-            case _:
-                raise RuntimeError(f"Could not validate semantics for blockitem {blockitem}")
-        new_block_items.append(resolved)
-    return Block(new_block_items)
+    return Block([resolve_block_item(item, identifier_map) for item in block.block_items])
 
 @log
-def resolve_param(param, identifier_map):
-    if param in identifier_map and identifier_map[param].from_current_scope:
-        raise RuntimeError("Duplicate variable declaration")
-    unique_name = NameGenerator.make_temporary(param)
-    identifier_map[param] = MapEntry(
-        name = unique_name, 
-        from_current_scope = True, 
-        has_linkage = False)
-    return unique_name
+def resolve_block_item(blockitem, identifier_map):
+    match blockitem:
+        case D(decl):
+            return D(resolve_local_declaration(decl, identifier_map))
+        case S(stmt):
+            return S(resolve_statement(stmt, identifier_map))
+        case _:
+            raise RuntimeError(f"Could not validate semantics for blockitem {blockitem}")
 
-@log
-def resolve_local_function_declaration(func_decl, identifier_map):
-    if func_decl.storage_class == StorageClass.static:
-        raise RuntimeError(f"Block scope function declaration {func_decl} cannot include static specifier")
-    return resolve_file_scope_function_declaration(func_decl, identifier_map)
-
-@log
-def resolve_local_variable_declaration(var_decl: VariableDeclaration, identifier_map):
-    if var_decl.name in identifier_map:
-        prev_entry = identifier_map[var_decl.name]
-        if prev_entry.from_current_scope:
-            if not (prev_entry.has_linkage and var_decl.storage_class == StorageClass.extern):
-                raise RuntimeError(f"Conflicting local declarations {var_decl} and {prev_entry}")
-    
-    if var_decl.storage_class == StorageClass.extern:
-        identifier_map[var_decl.name] = MapEntry(
-            name = var_decl.name,
-            from_current_scope = True,
-            has_linkage = True
-        )
-        return var_decl
-    unique_name = NameGenerator.make_temporary(var_decl.name)
-    identifier_map[var_decl.name] = MapEntry(
-        name = unique_name,
-        from_current_scope = True,
-        has_linkage = False
-    )
-    init = var_decl.init
-    if init is not None:
-        init = resolve_exp(init, identifier_map)
-    return VariableDeclaration(unique_name, init, var_decl.storage_class)        
-
-#TODO: Refactor with resolve_file_scope_declaration
 @log
 def resolve_local_declaration(decl, identifier_map):
-    match decl:
-        case FunDecl(function_declaration):
-            if function_declaration.body is not None:
-                raise RuntimeError(f"Local function definition {function_declaration}")
-            return FunDecl(resolve_local_function_declaration(function_declaration, identifier_map))
-        case VarDecl(variable_declaration):
-            return VarDecl(resolve_local_variable_declaration(variable_declaration, identifier_map))
-        case _:
-            raise RuntimeError(f"Could not validate semantics for declaration {decl}")
+    return resolve_declaration(decl, True, identifier_map)
 
-@log
-def resolve_file_scope_function_declaration(func_decl, identifier_map):
-    if func_decl.name in identifier_map:
-        prev_entry = identifier_map[func_decl.name]
-        if prev_entry.from_current_scope and not prev_entry.has_linkage:
-            raise RuntimeError("Duplicate declaration")
-
-    identifier_map[func_decl.name] = MapEntry(
-        name = func_decl.name,
-        from_current_scope = True,
-        has_linkage = True
-    )
-
-    inner_map = copy_identifier_map(identifier_map)
-    new_params = [resolve_param(param, inner_map) for param in func_decl.params]
-    
-    new_body = None
-    if func_decl.body is not None:
-        new_body = resolve_block(func_decl.body, inner_map)
-    return FunctionDeclaration(func_decl.name, new_params, new_body, func_decl.storage_class)
-        
-@log
-def resolve_file_scope_variable_declaration(var_decl, identifier_map):
-    identifier_map[var_decl.name] = MapEntry(
-        name = var_decl.name,
-        from_current_scope = True,
-        has_linkage = True
-    )
-    return var_decl
-        
 @log
 def resolve_file_scope_declaration(decl, identifier_map):
+    return resolve_declaration(decl, False, identifier_map)
+        
+def resolve_declaration(decl, is_local, identifier_map):
     match decl:
         case FunDecl(function_declaration):
-            return FunDecl(resolve_file_scope_function_declaration(function_declaration, identifier_map))
+            if is_local:
+                check_local_function_decl(function_declaration)
+            return FunDecl(resolve_function_declaration(function_declaration, identifier_map))
+        case VarDecl(variable_declaration) if is_local:
+            return VarDecl(resolve_local_variable_declaration(variable_declaration, identifier_map))
         case VarDecl(variable_declaration):
-            return VarDecl(resolve_file_scope_variable_declaration(variable_declaration, identifier_map))
+            register_file_scope_variable_decl(variable_declaration, identifier_map)
+            return VarDecl(variable_declaration)
         case _:
             raise RuntimeError(f"Could not validate semantics for declaration {decl}")
-        
+            
 @log("Resolving variables:")
 def resolve_program(program):
     identifier_map: dict[str, MapEntry] = {}
