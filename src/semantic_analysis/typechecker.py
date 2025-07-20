@@ -42,21 +42,6 @@ class SymbolEntry:
     defined: bool | None = None
     attrs: IdentifierAttr | None = None
 
-@log("Typechecking:")
-def typecheck_program(program):
-    for decl in program.declarations:
-        typecheck_file_scope_declaration(decl)
-
-@log
-def typecheck_file_scope_declaration(decl):
-    match decl:
-        case FunDecl(fun_decl):
-            typecheck_function_declaration(fun_decl)
-        case VarDecl(var_decl):
-            typecheck_file_scope_variable_declaration(var_decl)
-        case _:
-            raise RuntimeError(f"Cannot typecheck declaration {decl}")
-
 @log
 def typecheck_function_declaration(decl: FunctionDeclaration):
     fun_type = FunType(len(decl.params))
@@ -122,31 +107,6 @@ def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
         attrs = attrs)
 
 @log
-def typecheck_block(block):
-    for block_item in block.block_items:
-        typecheck_block_item(block_item)
-
-@log
-def typecheck_block_item(item):
-    match item:
-        case D(decl):
-            typecheck_local_declaration(decl)
-        case S(stmt):
-            typecheck_statement(stmt)
-        case _:
-            raise RuntimeError(f"Cannot typecheck block item {item}")
-        
-@log
-def typecheck_local_declaration(decl):
-    match decl:
-        case FunDecl(fun_decl):
-            typecheck_function_declaration(fun_decl)
-        case VarDecl(var_decl):
-            typecheck_local_variable_declaration(var_decl)
-        case _:
-            raise RuntimeError(f"Cannot typecheck declaration {decl}")
-
-@log
 def typecheck_local_variable_declaration(var_decl: VariableDeclaration):
     if var_decl.storage_class == StorageClass.extern:
         if var_decl.init is not None:
@@ -179,7 +139,72 @@ def typecheck_local_variable_declaration(var_decl: VariableDeclaration):
         typecheck_exp(var_decl.init)
 
 @log
-def typecheck_statement(stmt):
+def typecheck_func_call(identifier: str, args: List[Exp]):
+    f_type = symbol_table[identifier].type
+    if isinstance(f_type, Int):
+        raise RuntimeError(f"Variable used as function name {identifier}")
+    if f_type.param_count != len(args):
+        raise RuntimeError(f"Function {identifier} called with wrong number of arguments, expected {f_type.param_count}, found {len(args)}")
+    
+@log
+def typecheck_for_init_decl(decl: VariableDeclaration):
+    if decl.storage_class is not None:
+        raise RuntimeError(f"Cannot have storage class specifier in for init {decl}")
+    typecheck_local_variable_declaration(decl)
+
+@log
+def typecheck_variable(identifier: str):
+    if not isinstance(symbol_table[identifier].type, Int):
+        raise RuntimeError(f"Function name {identifier} used as variable")
+
+
+
+
+
+
+@log("Typechecking:")
+def typecheck_program(program: Program):
+    for decl in program.declarations:
+        typecheck_file_scope_declaration(decl)
+
+@log
+def typecheck_file_scope_declaration(decl: Declaration):
+    typecheck_declaration(decl, False)
+
+@log
+def typecheck_local_declaration(decl: Declaration):
+    typecheck_declaration(decl, True)
+        
+@log
+def typecheck_declaration(decl: Declaration, is_local: bool):
+    match decl:
+        case FunDecl(fun_decl):
+            typecheck_function_declaration(fun_decl)
+        case VarDecl(var_decl):
+            if is_local:
+                typecheck_local_variable_declaration(var_decl)
+            else:
+                typecheck_file_scope_variable_declaration(var_decl)
+        case _:
+            raise RuntimeError(f"Cannot typecheck declaration {decl}")
+
+@log
+def typecheck_block(block: Block):
+    for block_item in block.block_items:
+        typecheck_block_item(block_item)
+
+@log
+def typecheck_block_item(item: BlockItem):
+    match item:
+        case D(decl):
+            typecheck_local_declaration(decl)
+        case S(stmt):
+            typecheck_statement(stmt)
+        case _:
+            raise RuntimeError(f"Cannot typecheck block item {item}")
+        
+@log
+def typecheck_statement(stmt: Statement):
     match stmt:
         case Return(exp) | Expression(exp):
             typecheck_exp(exp)
@@ -206,12 +231,10 @@ def typecheck_statement(stmt):
             raise RuntimeError(f"Cannot typecheck statement {stmt}")
 
 @log
-def typecheck_for_init(init):
+def typecheck_for_init(init: ForInit):
     match init:
         case InitDecl(decl):
-            if decl.storage_class is not None:
-                raise RuntimeError(f"Cannot have storage class specifier in for init {decl}")
-            typecheck_local_variable_declaration(decl)
+            typecheck_for_init_decl(decl)
         case InitExp(None):
             pass
         case InitExp(exp):
@@ -220,7 +243,7 @@ def typecheck_for_init(init):
             raise RuntimeError(f"Cannot typecheck for init {init}")
 
 @log
-def typecheck_exp(exp):
+def typecheck_exp(exp: Exp):
     match exp:
         case Constant():
             pass
@@ -234,15 +257,10 @@ def typecheck_exp(exp):
             typecheck_exp(then)
             typecheck_exp(else_)
         case FunctionCall(identifier, args):
-            f_type = symbol_table[identifier].type
-            if isinstance(f_type, Int):
-                raise RuntimeError(f"Variable used as function name {identifier}")
-            if f_type.param_count != len(args):
-                raise RuntimeError(f"Function {identifier} called with wrong number of arguments, expected {f_type.param_count}, found {len(args)}")
+            typecheck_func_call(identifier, args)
             for arg in args:
                 typecheck_exp(arg)
-        case Var(v):
-            if not isinstance(symbol_table[v].type, Int):
-                raise RuntimeError(f"Function name {v} used as variable")
+        case Var(identifier):
+            typecheck_variable(identifier)
         case _:
             raise RuntimeError(f"Cannot typecheck exp {exp}")
