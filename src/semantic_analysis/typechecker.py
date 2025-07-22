@@ -4,6 +4,7 @@ from ..utils import log
 
 symbol_table: dict[str, SymbolEntry] = {}
 
+#TODO: Use types from c_ast.py
 class Int:
     pass
 

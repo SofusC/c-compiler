@@ -4,8 +4,6 @@ from dataclasses import dataclass
 
 class TokenType(Enum):
     RETURN              = r"return\b"
-    VOID                = r"void\b"
-    INT                 = r"int\b"
     IF                  = r"if\b"
     ELSE                = r"else\b"
     DO                  = r"do\b"
@@ -17,8 +15,14 @@ class TokenType(Enum):
     STATIC              = r"static\b"
     EXTERN              = r"extern\b"
 
+    VOID                = r"void\b"
+    INT                 = r"int\b"
+    LONG                = r"long\b"
+
     CONSTANT            = r"[0-9]+\b"
+    LONG_CONSTANT       = r"[0-9]+[lL]\b"
     IDENTIFIER          = r"[a-zA-Z_]\w*\b"
+
     OPEN_PAREN          = r"\("
     CLOSE_PAREN         = r"\)"
     OPEN_BRACE          = r"{"
@@ -79,6 +83,9 @@ def lex(file):
                     raise RuntimeError(f"Unexpected token {mo.group()}")
                 case TokenType.IDENTIFIER.name | TokenType.CONSTANT.name:
                     value = mo.group()
+                    result.append(Token(TokenType[token], value))
+                case TokenType.LONG_CONSTANT.name:
+                    value = mo.group()[:-1]
                     result.append(Token(TokenType[token], value))
                 case _:
                     result.append(Token(TokenType[token]))

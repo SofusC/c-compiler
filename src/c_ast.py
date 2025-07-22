@@ -10,11 +10,6 @@ class ASTNode(ABC):
 
 
 
-class Type(Enum):
-    Int = auto()
-
-
-
 @dataclass
 class Program(ASTNode):
     declarations: List[Declaration]
@@ -38,6 +33,7 @@ class VarDecl(Declaration):
 class VariableDeclaration(ASTNode):
     name: str
     init: Exp | None
+    var_type: Type
     storage_class: StorageClass | None
 
 @dataclass
@@ -45,7 +41,24 @@ class FunctionDeclaration(ASTNode):
     name: str
     params: List[str]
     body: Block | None
+    fun_type: Type
     storage_class: StorageClass | None
+
+
+
+class Type(ASTNode):
+    pass
+
+class Int(Type):
+    pass
+
+class Long(Type):
+    pass
+
+@dataclass
+class FunType(Type):
+    params: List[Type]
+    ret: Type
 
 
 
@@ -146,11 +159,16 @@ class Exp(ASTNode):
 
 @dataclass
 class Constant(Exp):
-    constant: int
+    constant: Const
 
 @dataclass
 class Var(Exp):
     identifier: str
+
+@dataclass
+class Cast(Exp):
+    target_type: Type
+    exp: Exp
 
 @dataclass
 class Unary(Exp):
@@ -202,3 +220,17 @@ class BinaryOperator(Enum):
     LessOrEqual = auto()
     GreaterThan = auto()
     GreaterOrEqual = auto()
+
+
+
+class Const(ASTNode):
+    pass
+
+@dataclass
+class ConstInt(Const):
+    int: int
+    
+@dataclass
+class ConstLong(Const):
+    int: int
+    

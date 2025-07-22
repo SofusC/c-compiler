@@ -1,3 +1,4 @@
+
 import logging
 from functools import wraps
 import inspect
@@ -21,7 +22,7 @@ handler = logging.StreamHandler()
 formatter = ColorFormatter('%(levelname)s : %(message)s')
 handler.setFormatter(formatter)
 #TODO: Make the debugging level configurable
-logging.basicConfig(level=logging.INFO, handlers=[handler])
+logging.basicConfig(level=logging.DEBUG, handlers=[handler])
 
 def log(arg = None):
     def decorator(func):

@@ -6,7 +6,8 @@ from .c_ast import *
 @dataclass
 class Parser:
     tokens: List[Token] #TODO: Should probably be a deque
-    specifiers = [TokenType.INT, TokenType.EXTERN, TokenType.STATIC]
+    type_specifiers = [TokenType.INT, TokenType.LONG]
+    specifiers = [TokenType.INT, TokenType.LONG, TokenType.EXTERN, TokenType.STATIC]
     PRECEDENCE = {
         TokenType.ASTERISK:             50,
         TokenType.FORWARD_SLASH:        50,
@@ -76,20 +77,33 @@ class Parser:
                     break
                 self.expect(TokenType.COMMA)
         return args
+    
+    def parse_constant(self, token):
+        value = int(token.value)
+        if value > 2**63 - 1:
+            raise RuntimeError(f"Constant in token: {token} is too large for int or long")
+        if token.token_type == TokenType.CONSTANT and value <= 2**31 - 1:
+            return ConstInt(value)
+        return ConstLong(value)
             
     def parse_factor(self) -> Exp:
         token = self.expect([
-            TokenType.CONSTANT, 
+            TokenType.CONSTANT,
+            TokenType.LONG_CONSTANT,
             TokenType.TILDE, 
             TokenType.HYPHEN, 
             TokenType.EXCLAMATION_POINT, 
             TokenType.OPEN_PAREN, 
             TokenType.IDENTIFIER])
         match token.token_type:
-            case TokenType.CONSTANT:
-                return Constant(token.value)
+            case TokenType.CONSTANT | TokenType.LONG_CONSTANT:
+                return Constant(self.parse_constant(token))
             case TokenType.TILDE | TokenType.HYPHEN | TokenType.EXCLAMATION_POINT as unop:
                 return Unary(self.unop_map[unop], self.parse_factor())
+            case TokenType.OPEN_PAREN if self.peek().token_type in self.type_specifiers:
+                type = self.parse_type_specifiers()
+                self.expect(TokenType.CLOSE_PAREN)
+                return Cast(type, self.parse_factor())
             case TokenType.OPEN_PAREN:
                 exp = self.parse_exp()
                 self.expect(TokenType.CLOSE_PAREN)
@@ -233,18 +247,26 @@ class Parser:
         self.expect(TokenType.CLOSE_BRACE)
         return Block(block_items)
     
+    def parse_type_specifiers(self):
+        tokens = []
+        while self.peek().token_type in self.type_specifiers:
+            token = self.expect(self.type_specifiers)
+            tokens.append(token)
+        return self.parse_type(tokens)
+    
     def parse_param_list(self) -> List[str]:
+        types = []
         params = []
         if self.peek().token_type == TokenType.VOID:
             self.advance()
-            return params
-        self.expect(TokenType.INT)
+            return types, params
+        types.append(self.parse_type_specifiers())
         params.append(self.expect(TokenType.IDENTIFIER).value)
         while self.peek().token_type != TokenType.CLOSE_PAREN:
             self.expect(TokenType.COMMA)
-            self.expect(TokenType.INT)
+            types.append(self.parse_type_specifiers())
             params.append(self.expect(TokenType.IDENTIFIER).value)
-        return params
+        return types, params
     
     def parse_variable_declaration(self, type, storage_class) -> VariableDeclaration:
         name = self.expect(TokenType.IDENTIFIER).value
@@ -253,36 +275,43 @@ class Parser:
             self.advance()
             init = self.parse_exp()
         self.expect(TokenType.SEMICOLON)
-        return VariableDeclaration(name, init, storage_class)
+        return VariableDeclaration(name, init, type, storage_class)
  
-    def parse_function_declaration(self, type, storage_class) -> FunctionDeclaration:
+    def parse_function_declaration(self, ret_type, storage_class) -> FunctionDeclaration:
         name = self.expect(TokenType.IDENTIFIER).value
         self.expect(TokenType.OPEN_PAREN)
-        params = self.parse_param_list()
+        param_types, params = self.parse_param_list()
         self.expect(TokenType.CLOSE_PAREN)
         body = None
         if self.peek().token_type == TokenType.OPEN_BRACE:
             body = self.parse_block()
         else:
             self.expect(TokenType.SEMICOLON)
-        return FunctionDeclaration(name, params, body, storage_class)
+        fun_type = FunType(param_types, ret_type)
+        return FunctionDeclaration(name, params, body, fun_type, storage_class)
+    
+    def parse_type(self, tokens):
+        types = [t.token_type for t in tokens]
+        if types == [TokenType.INT]:
+            return Int()
+        if types == [TokenType.INT, TokenType.LONG] or types == [TokenType.LONG, TokenType.INT] or types == [TokenType.LONG]:
+            return Long()
+        raise RuntimeError(f"Invalid type specifier {types}")
     
     def parse_type_and_storage_class(self):
         types = []
         storage_classes = []
         while self.peek().token_type in self.specifiers:
             token = self.expect(self.specifiers)
-            if token.token_type == TokenType.INT:
+            if token.token_type in [TokenType.INT, TokenType.LONG]:
                 types.append(token)
             else:
                 storage_classes.append(token)
 
-        if len(types) != 1:
-            raise RuntimeError(f"Invalid type specifier(s) {types}")
         if len(storage_classes) > 1:
             raise RuntimeError("Invalid storage class")
         
-        type = Type.Int
+        type = self.parse_type(types)
 
         if len(storage_classes) == 1:
             token_type = storage_classes[0].token_type
