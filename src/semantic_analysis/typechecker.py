@@ -74,29 +74,24 @@ def typecheck_function_declaration(decl: FunctionDeclaration):
 
 @log
 def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
-    if isinstance(var_decl.init, Constant):
-        match var_decl.init.constant:
-            case ConstInt(i):
-                initial_value = Initial(IntInit(static_type_conversion(i, Int())))
-            case ConstLong(l):
-                initial_value = Initial(LongInit(l))
-            case _:
-                raise RuntimeError(f"Compiler error, cant typecheck {var_decl.init.constant}")
+    name, init, type_, storage_class = var_decl.name, var_decl.init, var_decl.var_type, var_decl.storage_class
+    if isinstance(init, Constant):
+        initial_value = resolve_const_init(init)
     elif var_decl.init is None:
-        if var_decl.storage_class == StorageClass.extern:
+        if storage_class == StorageClass.extern:
             initial_value = NoInitializer()
         else:
             initial_value = Tentative()
     else:
-        raise RuntimeError(f"Non-constant initializer {var_decl.init}")
+        raise RuntimeError(f"Non-constant initializer {init}")
     
-    global_ = var_decl.storage_class != StorageClass.static
+    global_ = storage_class != StorageClass.static
 
-    if var_decl.name in symbol_table:
-        old_decl = symbol_table[var_decl.name]
-        if old_decl.type != var_decl.var_type:
-            raise RuntimeError(f"Conflicting types of variable {var_decl.name}: {old_decl.type} and {var_decl.var_type}")
-        if var_decl.storage_class == StorageClass.extern:
+    if name in symbol_table:
+        old_decl = symbol_table[name]
+        if old_decl.type != type_:
+            raise RuntimeError(f"Conflicting types of variable {name}: {old_decl.type} and {type_}")
+        if storage_class == StorageClass.extern:
             global_ = old_decl.attrs.global_
         elif old_decl.attrs.global_ != global_:
             raise RuntimeError(f"Conflicting variable linkage between {old_decl} and {var_decl}")
@@ -109,44 +104,43 @@ def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
         elif not isinstance(initial_value, Initial) and isinstance(old_decl.attrs.init, Tentative):
             initial_value = Tentative()
     attrs = StaticAttr(init = initial_value, global_ = global_)
-    symbol_table[var_decl.name] = SymbolEntry(
-        type = var_decl.var_type, 
+    symbol_table[name] = SymbolEntry(
+        type = type_, 
         attrs = attrs)
 
 @log
 def typecheck_local_variable_declaration(var_decl: VariableDeclaration):
-    if var_decl.storage_class == StorageClass.extern:
-        if var_decl.init is not None:
+    name, init, type_, storage_class = var_decl.name, var_decl.init, var_decl.var_type, var_decl.storage_class
+    if storage_class == StorageClass.extern:
+        if init is not None:
             raise RuntimeError(f"Initializer on local extern variable declaration {var_decl}")
-        if var_decl.name in symbol_table:
-            old_decl = symbol_table[var_decl.name]
-            if old_decl.type != var_decl.var_type:
-                raise RuntimeError(f"Conflicting types of variable {var_decl.name}: {old_decl.type} and {var_decl.var_type}")
+        if name in symbol_table:
+            old_decl = symbol_table[name]
+            if old_decl.type != type_:
+                raise RuntimeError(f"Conflicting types of variable {name}: {old_decl.type} and {type_}")
         else:
-            symbol_table[var_decl.name] = SymbolEntry(
-                type = var_decl.var_type,
+            symbol_table[name] = SymbolEntry(
+                type = type_,
                 attrs = StaticAttr(init = NoInitializer(), global_ = True)
             )
-    elif var_decl.storage_class == StorageClass.static:
-        match var_decl.init:
-            case Constant(ConstInt() as c):
-                initial_value = Initial(IntInit(c.int))
-            case Constant(ConstLong() as c):
-                initial_value = Initial(LongInit(c.int))
-            case None:
-                initial_value = Initial(IntInit(0))
-            case _:
-                raise RuntimeError(f"Non-constant initializer on local static variable {var_decl}")
-        symbol_table[var_decl.name] = SymbolEntry(
-            type = var_decl.var_type,
+    elif storage_class == StorageClass.static:
+        if init is None:
+            initial_value = Initial(IntInit(0))
+        elif isinstance(init, Constant):
+            initial_value = resolve_const_init(init)
+        else:
+            raise RuntimeError(f"Non-constant initializer on local static variable {var_decl}")
+        symbol_table[name] = SymbolEntry(
+            type = type_,
             attrs = StaticAttr(init = initial_value, global_ = False)
         )
     else:
-        symbol_table[var_decl.name] = SymbolEntry(
-            type = var_decl.var_type,
+        symbol_table[name] = SymbolEntry(
+            type = type_,
             attrs = LocalAttr())
-        if var_decl.init is not None:
-            typecheck_exp(var_decl.init)
+        if init is not None:
+            typecheck_exp(init)
+            set_type(init, type_)
     
 @log
 def typecheck_for_init_decl(decl: VariableDeclaration):
@@ -263,17 +257,21 @@ def convert_to(exp: Exp, type: Type):
 
 @log 
 def static_type_conversion(value: int, to_type):
-    #TODO: Should be cleaned up.
-    if to_type == Int():
-        if -2**31 <= value and value <= 2**31-1:
-            return value
-        elif value < -2**31:
-            return static_type_conversion(value + 2**32, to_type)
-        else:
-            return static_type_conversion(value - 2**32, to_type)
-    else:
-        raise RuntimeError(f"Compiler error, cant statically convert to type {to_type}")
+    if not isinstance(to_type, Int):
+        raise RuntimeError(f"Compiler error: cannot statically convert to type {to_type}")
 
+    return ((value + 2**31) % 2**32) - 2**31
+
+@log
+def resolve_const_init(constant: Constant):
+    match constant.constant:
+        case ConstInt(i):
+            initial_value = Initial(IntInit(static_type_conversion(i, Int())))
+        case ConstLong(l):
+            initial_value = Initial(LongInit(l))
+        case _:
+            raise RuntimeError(f"Compiler error, cant typecheck {constant}")
+    return initial_value
 
 
 @log("Typechecking:")
