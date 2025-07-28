@@ -4,21 +4,21 @@ from ..utils import log
 
 symbol_table: dict[str, SymbolEntry] = {}
 
-#TODO: Use types from c_ast.py
-class Int:
-    pass
 
 @dataclass
-class FunType:
-    param_count: int
+class IntInit:
+    int: int
+@dataclass
+class LongInit:
+    int: int
 
-Types = Int | FunType
+StaticInit = IntInit | LongInit
 
 class Tentative:
     pass
 @dataclass
 class Initial:
-    int: int
+    init: StaticInit
 class NoInitializer:
     pass
 
@@ -39,13 +39,13 @@ IdentifierAttr = FunAttr | StaticAttr | LocalAttr
 
 @dataclass
 class SymbolEntry:
-    type: Types
+    type: Type
     defined: bool | None = None
     attrs: IdentifierAttr | None = None
 
 @log
 def typecheck_function_declaration(decl: FunctionDeclaration):
-    fun_type = FunType(len(decl.params))
+    fun_type = decl.fun_type
     has_body = decl.body is not None
     already_defined = False
     global_decl = decl.storage_class != StorageClass.static
@@ -68,14 +68,20 @@ def typecheck_function_declaration(decl: FunctionDeclaration):
         attrs = attrs
     )
     if has_body:
-        for param in decl.params:
-            symbol_table[param] = SymbolEntry(Int())
-        typecheck_block(decl.body)
+        for param, param_type in zip(decl.params, fun_type.params):
+            symbol_table[param] = SymbolEntry(param_type)
+        typecheck_block(decl.body, fun_type.ret)
 
 @log
 def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
     if isinstance(var_decl.init, Constant):
-        initial_value = Initial(var_decl.init.constant)
+        match var_decl.init.constant:
+            case ConstInt(i):
+                initial_value = Initial(IntInit(static_type_conversion(i, Int())))
+            case ConstLong(l):
+                initial_value = Initial(LongInit(l))
+            case _:
+                raise RuntimeError(f"Compiler error, cant typecheck {var_decl.init.constant}")
     elif var_decl.init is None:
         if var_decl.storage_class == StorageClass.extern:
             initial_value = NoInitializer()
@@ -88,8 +94,8 @@ def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
 
     if var_decl.name in symbol_table:
         old_decl = symbol_table[var_decl.name]
-        if not isinstance(old_decl.type, Int):
-            raise RuntimeError(f"Function redeclared as variable {var_decl}")
+        if old_decl.type != var_decl.var_type:
+            raise RuntimeError(f"Conflicting types of variable {var_decl.name}: {old_decl.type} and {var_decl.var_type}")
         if var_decl.storage_class == StorageClass.extern:
             global_ = old_decl.attrs.global_
         elif old_decl.attrs.global_ != global_:
@@ -104,7 +110,7 @@ def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
             initial_value = Tentative()
     attrs = StaticAttr(init = initial_value, global_ = global_)
     symbol_table[var_decl.name] = SymbolEntry(
-        type = Int(), 
+        type = var_decl.var_type, 
         attrs = attrs)
 
 @log
@@ -114,38 +120,33 @@ def typecheck_local_variable_declaration(var_decl: VariableDeclaration):
             raise RuntimeError(f"Initializer on local extern variable declaration {var_decl}")
         if var_decl.name in symbol_table:
             old_decl = symbol_table[var_decl.name]
-            if not isinstance(old_decl.type, Int):
-                raise RuntimeError(f"Function redeclared as variable {var_decl}")
+            if old_decl.type != var_decl.var_type:
+                raise RuntimeError(f"Conflicting types of variable {var_decl.name}: {old_decl.type} and {var_decl.var_type}")
         else:
             symbol_table[var_decl.name] = SymbolEntry(
-                type = Int(),
+                type = var_decl.var_type,
                 attrs = StaticAttr(init = NoInitializer(), global_ = True)
             )
     elif var_decl.storage_class == StorageClass.static:
-        if isinstance(var_decl.init, Constant):
-            initial_value = Initial(var_decl.init.constant)
-        elif var_decl.init is None:
-            initial_value = Initial(0)
-        else:
-            raise RuntimeError(f"Non-constant initializer on local static variable {var_decl}")
+        match var_decl.init:
+            case Constant(ConstInt() as c):
+                initial_value = Initial(IntInit(c.int))
+            case Constant(ConstLong() as c):
+                initial_value = Initial(LongInit(c.int))
+            case None:
+                initial_value = Initial(IntInit(0))
+            case _:
+                raise RuntimeError(f"Non-constant initializer on local static variable {var_decl}")
         symbol_table[var_decl.name] = SymbolEntry(
-            type = Int(),
+            type = var_decl.var_type,
             attrs = StaticAttr(init = initial_value, global_ = False)
         )
     else:
         symbol_table[var_decl.name] = SymbolEntry(
-            type = Int(),
+            type = var_decl.var_type,
             attrs = LocalAttr())
-    if var_decl.init is not None:
-        typecheck_exp(var_decl.init)
-
-@log
-def typecheck_func_call(identifier: str, args: List[Exp]):
-    f_type = symbol_table[identifier].type
-    if isinstance(f_type, Int):
-        raise RuntimeError(f"Variable used as function name {identifier}")
-    if f_type.param_count != len(args):
-        raise RuntimeError(f"Function {identifier} called with wrong number of arguments, expected {f_type.param_count}, found {len(args)}")
+        if var_decl.init is not None:
+            typecheck_exp(var_decl.init)
     
 @log
 def typecheck_for_init_decl(decl: VariableDeclaration):
@@ -154,12 +155,124 @@ def typecheck_for_init_decl(decl: VariableDeclaration):
     typecheck_local_variable_declaration(decl)
 
 @log
-def typecheck_variable(identifier: str):
-    if not isinstance(symbol_table[identifier].type, Int):
-        raise RuntimeError(f"Function name {identifier} used as variable")
+def typecheck_variable(var: Var):
+    v_type = symbol_table[var.identifier].type
+    if isinstance(v_type, FunType):
+        raise RuntimeError(f"Function name {var.identifier} used as variable")
+    set_type(var, v_type)
 
+@log
+def typecheck_constant(constant: Constant):
+    match constant.constant:
+        case ConstInt(i):
+            set_type(constant, Int())
+        case ConstLong(l):
+            set_type(constant, Long())
 
+@log
+def typecheck_cast(cast: Cast):
+    typecheck_exp(cast.exp)
+    set_type(cast, cast.target_type)
 
+@log
+def typecheck_unary(unary: Unary):
+    typecheck_exp(unary.exp)
+    if unary.unary_operator.is_logical:
+        set_type(unary, Int())
+    else:
+        set_type(unary, get_type(unary.exp))
+
+@log
+def typecheck_binary(binary: Binary):
+    typecheck_exp(binary.left_exp)
+    typecheck_exp(binary.right_exp)
+    if binary.binary_operator.is_logical:
+        set_type(binary, Int())
+        return
+    t1 = get_type(binary.left_exp)
+    t2 = get_type(binary.right_exp)
+    common_type = get_common_type(t1, t2)
+    binary.left_exp = convert_to(binary.left_exp, common_type)
+    binary.right_exp = convert_to(binary.right_exp, common_type)
+    if binary.binary_operator.is_arithmetic:
+        set_type(binary, common_type)
+    else:
+        set_type(binary, Int())
+    
+@log
+def typecheck_assignment(assignment: Assignment):
+    typecheck_exp(assignment.left)
+    typecheck_exp(assignment.right)
+    left_type = get_type(assignment.left)
+    assignment.right = convert_to(assignment.right, left_type)
+    set_type(assignment, left_type)
+
+@log
+def typecheck_conditional(conditional: Conditional):
+    typecheck_exp(conditional.condition)
+    typecheck_exp(conditional.then_exp)
+    typecheck_exp(conditional.else_exp)
+    then_type = get_type(conditional.then_exp)
+    else_type = get_type(conditional.else_exp)
+    common_type = get_common_type(then_type, else_type)
+    conditional.then_exp = convert_to(conditional.then_exp, common_type)
+    conditional.else_exp = convert_to(conditional.else_exp, common_type)
+    set_type(conditional, common_type)
+
+@log
+def typecheck_function_call(func_call: FunctionCall):
+    f_type = symbol_table[func_call.identifier].type
+    if not isinstance(f_type, FunType):
+        raise RuntimeError(f"Variable used as function name {func_call.identifier}")
+    if len(f_type.params) != len(func_call.args):
+        raise RuntimeError(f"Function {func_call.identifier} called with wrong number of arguments, expected {len(f_type.params)}, found {len(func_call.args)}")
+    converted_args = []
+    for arg, param_type in zip(func_call.args, f_type.params):
+        typecheck_exp(arg)
+        converted_args.append(convert_to(arg, param_type))
+    func_call.args = converted_args
+    set_type(func_call, f_type.ret)
+
+@log
+def typecheck_return(return_stmt: Return, fun_ret_type: Type):
+    typecheck_exp(return_stmt.exp)
+    return_stmt.exp = convert_to(return_stmt.exp, fun_ret_type)
+    
+@log
+def set_type(exp: Exp, type: Type):
+    exp.type = type
+
+@log
+def get_type(exp: Exp):
+    return exp.type
+
+@log
+def get_common_type(type1: Type, type2: Type):
+    if type1 == type2:
+        return type1
+    else:
+        return Long()
+    
+@log
+def convert_to(exp: Exp, type: Type):
+    if get_type(exp) == type:
+        return exp
+    cast_exp = Cast(exp, type)
+    set_type(cast_exp, type)
+    return cast_exp
+
+@log 
+def static_type_conversion(value: int, to_type):
+    #TODO: Should be cleaned up.
+    if to_type == Int():
+        if -2**31 <= value and value <= 2**31-1:
+            return value
+        elif value < -2**31:
+            return static_type_conversion(value + 2**32, to_type)
+        else:
+            return static_type_conversion(value - 2**32, to_type)
+    else:
+        raise RuntimeError(f"Compiler error, cant statically convert to type {to_type}")
 
 
 
@@ -190,44 +303,46 @@ def typecheck_declaration(decl: Declaration, is_local: bool):
             raise RuntimeError(f"Cannot typecheck declaration {decl}")
 
 @log
-def typecheck_block(block: Block):
+def typecheck_block(block: Block, fun_ret_type: Type):
     for block_item in block.block_items:
-        typecheck_block_item(block_item)
+        typecheck_block_item(block_item, fun_ret_type)
 
 @log
-def typecheck_block_item(item: BlockItem):
+def typecheck_block_item(item: BlockItem, fun_ret_type: Type):
     match item:
         case D(decl):
             typecheck_local_declaration(decl)
         case S(stmt):
-            typecheck_statement(stmt)
+            typecheck_statement(stmt, fun_ret_type)
         case _:
             raise RuntimeError(f"Cannot typecheck block item {item}")
         
 @log
-def typecheck_statement(stmt: Statement):
+def typecheck_statement(stmt: Statement, fun_ret_type: Type):
     match stmt:
-        case Return(exp) | Expression(exp):
+        case Return():
+            typecheck_return(stmt, fun_ret_type)
+        case Expression(exp):
             typecheck_exp(exp)
         case If(cond, then, else_):
             typecheck_exp(cond)
-            typecheck_statement(then)
+            typecheck_statement(then, fun_ret_type)
             if else_:
-                typecheck_statement(else_)
+                typecheck_statement(else_, fun_ret_type)
         case Compound(block):
-            typecheck_block(block)
+            typecheck_block(block, fun_ret_type)
         case Break() | Continue() | Null():
             pass
         case While(cond, body, _) | DoWhile(body, cond, _):
             typecheck_exp(cond)
-            typecheck_statement(body)
+            typecheck_statement(body, fun_ret_type)
         case For(init, cond, post, body, _):
             typecheck_for_init(init)
             if cond:
                 typecheck_exp(cond)
             if post:
                 typecheck_exp(post)
-            typecheck_statement(body)
+            typecheck_statement(body, fun_ret_type)
         case _:
             raise RuntimeError(f"Cannot typecheck statement {stmt}")
 
@@ -247,21 +362,20 @@ def typecheck_for_init(init: ForInit):
 def typecheck_exp(exp: Exp):
     match exp:
         case Constant():
-            pass
-        case Unary(_, exp):
-            typecheck_exp(exp)
-        case Binary(_, left, right) | Assignment(left, right):
-            typecheck_exp(left)
-            typecheck_exp(right)
-        case Conditional(cond, then, else_):
-            typecheck_exp(cond)
-            typecheck_exp(then)
-            typecheck_exp(else_)
-        case FunctionCall(identifier, args):
-            typecheck_func_call(identifier, args)
-            for arg in args:
-                typecheck_exp(arg)
-        case Var(identifier):
-            typecheck_variable(identifier)
+            typecheck_constant(exp)
+        case Unary():
+            typecheck_unary(exp)
+        case Binary():
+            typecheck_binary(exp)
+        case Assignment():
+            typecheck_assignment(exp)
+        case Conditional():
+            typecheck_conditional(exp)
+        case FunctionCall():
+            typecheck_function_call(exp)
+        case Var():
+            typecheck_variable(exp)
+        case Cast():
+            typecheck_cast(exp)
         case _:
             raise RuntimeError(f"Cannot typecheck exp {exp}")

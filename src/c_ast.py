@@ -46,16 +46,18 @@ class FunctionDeclaration(ASTNode):
 
 
 
-class Type(ASTNode):
+class Type(ASTNode): 
     pass
 
+@dataclass(frozen = True)
 class Int(Type):
     pass
 
-class Long(Type):
+@dataclass(frozen = True)
+class Long(Type): 
     pass
 
-@dataclass
+@dataclass(frozen = True)
 class FunType(Type):
     params: List[Type]
     ret: Type
@@ -153,9 +155,9 @@ class Null(Statement):
     pass
 
 
-
+@dataclass(kw_only = True)
 class Exp(ASTNode):
-    pass
+    type: Type | None = None
 
 @dataclass
 class Constant(Exp):
@@ -204,6 +206,10 @@ class UnaryOperator(Enum):
     Negate = auto()
     Not = auto()
 
+    @property
+    def is_logical(self):
+        return self == UnaryOperator.Not #TODO: Are other properties like this needed? Can this be moved to a base class for operators?
+
 class BinaryOperator(Enum):
     Add = auto()
     Subtract = auto()
@@ -221,6 +227,13 @@ class BinaryOperator(Enum):
     GreaterThan = auto()
     GreaterOrEqual = auto()
 
+    @property
+    def is_logical(self):
+        return self in {BinaryOperator.And, BinaryOperator.Or}
+    
+    @property
+    def is_arithmetic(self):
+        return self in {BinaryOperator.Add, BinaryOperator.Subtract, BinaryOperator.Multiply, BinaryOperator.Divide, BinaryOperator.Remainder}
 
 
 class Const(ASTNode):

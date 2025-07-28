@@ -49,7 +49,7 @@ def label_block(block, current_label = None):
 @log
 def label_function_declaration(fun_decl):
     body = label_block(fun_decl.body) if fun_decl.body else None
-    return FunctionDeclaration(fun_decl.name, fun_decl.params, body, fun_decl.storage_class)
+    return FunctionDeclaration(fun_decl.name, fun_decl.params, body, fun_decl.fun_type, fun_decl.storage_class)
 
 @log("Labelling loops:")
 def label_program(program):

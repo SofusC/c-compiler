@@ -102,7 +102,7 @@ def check_assignment_lvalue(left):
 
 
 @log
-def resolve_function_declaration(func_decl, identifier_map):
+def resolve_function_declaration(func_decl: FunctionDeclaration, identifier_map):
     register_function_decl(func_decl, identifier_map)
 
     inner_map = copy_identifier_map(identifier_map)
@@ -111,7 +111,7 @@ def resolve_function_declaration(func_decl, identifier_map):
     new_body = None
     if func_decl.body is not None:
         new_body = resolve_block(func_decl.body, inner_map)
-    return FunctionDeclaration(func_decl.name, new_params, new_body, func_decl.storage_class)
+    return FunctionDeclaration(func_decl.name, new_params, new_body, func_decl.fun_type, func_decl.storage_class)
      
 @log
 def resolve_local_variable_declaration(var_decl: VariableDeclaration, identifier_map):
@@ -119,7 +119,7 @@ def resolve_local_variable_declaration(var_decl: VariableDeclaration, identifier
     init = var_decl.init
     if init is not None:
         init = resolve_exp(init, identifier_map)
-    return VariableDeclaration(new_name, init, var_decl.storage_class)
+    return VariableDeclaration(new_name, init, var_decl.var_type, var_decl.storage_class)
 
 @log
 def resolve_exp(exp, identifier_map):
@@ -129,6 +129,8 @@ def resolve_exp(exp, identifier_map):
             return Assignment(resolve_exp(left, identifier_map), resolve_exp(right, identifier_map))
         case Var(v):
             return Var(resolve_variable_name(v, identifier_map))
+        case Cast(t, exp):
+            return Cast(t, resolve_exp(exp, identifier_map))
         case Constant():
             return exp
         case Unary(unop, exp):
@@ -155,6 +157,8 @@ def resolve_for_init(init, identifier_map):
             return InitExp(None)
         case InitExp(exp):
             return InitExp(resolve_exp(exp, identifier_map))
+        case _:
+            raise RuntimeError(f"Could not validate semantics for for_init {init}")
 
 @log
 def resolve_statement(statement, identifier_map):
@@ -228,8 +232,5 @@ def resolve_declaration(decl, is_local, identifier_map):
 @log("Resolving variables:")
 def resolve_program(program):
     identifier_map: dict[str, MapEntry] = {}
-    new_decls = []
-    for decl in program.declarations:
-        resolved = resolve_file_scope_declaration(decl, identifier_map)
-        new_decls.append(resolved)
-    return Program(new_decls)
+    resolved_declarations = [resolve_file_scope_declaration(decl, identifier_map) for decl in program.declarations]
+    return Program(resolved_declarations)
