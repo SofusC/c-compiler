@@ -251,7 +251,7 @@ def get_common_type(type1: Type, type2: Type):
 def convert_to(exp: Exp, type: Type):
     if get_type(exp) == type:
         return exp
-    cast_exp = Cast(exp, type)
+    cast_exp = Cast(type, exp)
     set_type(cast_exp, type)
     return cast_exp
 

@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from abc import ABC
 from typing import List
 from enum import Enum, auto
+from .c_ast import Type, Const
+from .semantic_analysis.typechecker import StaticInit
 
 class TackyNode(ABC):
     pass
@@ -27,7 +29,8 @@ class IRFunctionDefinition(IRTopLevel):
 class IRStaticVariable(IRTopLevel):
     name: str
     global_: bool
-    init: int
+    type: Type
+    init: StaticInit
 
 
 
@@ -37,6 +40,16 @@ class IRInstruction(TackyNode):
 @dataclass
 class IRReturn(IRInstruction):
     val: IRVal
+
+@dataclass
+class IRSignExtend(IRInstruction):
+    src: IRVal
+    dst: IRVal
+
+@dataclass
+class IRTruncate(IRInstruction):
+    src: IRVal
+    dst: IRVal
     
 @dataclass
 class IRUnary(IRInstruction):
@@ -87,7 +100,7 @@ class IRVal(TackyNode):
 
 @dataclass
 class IRConstant(IRVal):
-    int: int
+    const: Const
     
 @dataclass
 class IRVar(IRVal):
