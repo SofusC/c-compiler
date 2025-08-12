@@ -2,11 +2,17 @@ from __future__ import annotations
 from enum import Enum
 from dataclasses import dataclass
 from typing import List
+from .semantic_analysis.typechecker import StaticInit
 
 @dataclass
 class AsmProgram():
     top_levels: List[AsmTopLevel]
 
+
+
+class AssemblyType(Enum):
+    Longword = "l"
+    Quadword = "q"
 
 
 class AsmTopLevel():
@@ -22,8 +28,8 @@ class AsmFunctionDef(AsmTopLevel):
 class AsmStaticVar(AsmTopLevel):
     name: str
     global_: bool
-    init: int
-
+    alignment: int
+    init: StaticInit
 
 
 class AsmInstruction():
@@ -31,31 +37,42 @@ class AsmInstruction():
 
 @dataclass
 class AsmMov(AsmInstruction):
+    type_: AssemblyType
+    src: AsmOperand
+    dst: AsmOperand
+
+@dataclass
+class AsmMovsx(AsmInstruction):
     src: AsmOperand
     dst: AsmOperand
 
 @dataclass
 class AsmUnary(AsmInstruction):
     unary_operator: AsmUnaryOperator
+    type_: AssemblyType
     operand: AsmOperand
 
 @dataclass
 class AsmBinary(AsmInstruction):
     binary_operator: AsmBinaryOperator
+    type_: AssemblyType
     src: AsmOperand
     dst: AsmOperand
 
 @dataclass
 class AsmCmp(AsmInstruction):
+    type_: AssemblyType
     operand1: AsmOperand
     operand2: AsmOperand
 
 @dataclass
 class AsmIdiv(AsmInstruction):
+    type_: AssemblyType
     src: AsmOperand
 
+@dataclass
 class AsmCdq(AsmInstruction):
-    pass
+    type_: AssemblyType
 
 @dataclass
 class AsmJmp(AsmInstruction):
@@ -150,6 +167,7 @@ class AsmRegs(Enum):
     R9  = (f"%r9",   f"%r9d",  f"%r9b")
     R10 = (f"%r10",  f"%r10d", f"%r10b")
     R11 = (f"%r11",  f"%r11d", f"%r11b")
+    SP  = (f"%rsp",  f"%esp",  f"%spl")
 
     def __init__(self, qword, dword, byte):
         self._qword = qword

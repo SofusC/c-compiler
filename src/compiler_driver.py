@@ -36,6 +36,7 @@ def assemble_object(file):
 
 
 def main():
+    # TODO: Bedre parsing af argumenter, inkludér DEBUG argument til beartype og @log
     input_files = []
     stage = "all"
     for arg in sys.argv[1:]:

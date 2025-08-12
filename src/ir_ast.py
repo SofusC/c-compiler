@@ -130,4 +130,8 @@ class IRBinaryOperator(Enum):
     @property
     def is_relational(self):
         return self in {IRBinaryOperator.Equal, IRBinaryOperator.NotEqual, IRBinaryOperator.LessThan, IRBinaryOperator.LessOrEqual, IRBinaryOperator.GreaterThan, IRBinaryOperator.GreaterOrEqual}
+    
+    @property
+    def is_arithmetic(self):
+        return self in {IRBinaryOperator.Add, IRBinaryOperator.Subtract, IRBinaryOperator.Multiply, IRBinaryOperator.Divide, IRBinaryOperator.Remainder}
         

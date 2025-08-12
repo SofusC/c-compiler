@@ -1,5 +1,7 @@
 from .ir_ast import *
 from .assembly_ast import *
+from .c_ast import ConstInt, ConstLong, Int, Long
+from .semantic_analysis.typechecker import symbol_table
 
 _RELATIONAL_MAP = {
     IRBinaryOperator.Equal          : AsmCondCode.E,
@@ -18,7 +20,7 @@ _OPERATOR_MAP = {
     IRBinaryOperator.Multiply       : AsmBinaryOperator.Mult,
 }
         
-def lower_program(program: IRProgram):
+def lower_program(program: IRProgram) -> AsmProgram:
     toplevels = [lower_toplevel(toplevel) for toplevel in program.toplevels]
     return AsmProgram(toplevels)
 
@@ -26,29 +28,43 @@ def lower_toplevel(toplevel: IRTopLevel):
     match toplevel:
         case IRFunctionDefinition():
             return lower_function_definition(toplevel)
-        case IRStaticVariable(name, global_, init):
-            return AsmStaticVar(name, global_, init)
+        case IRStaticVariable(name, global_, type, init):
+            return AsmStaticVar(name, global_, get_type_alignment(type), init)
         case _:
             raise NotImplementedError(f"Top-level object {toplevel} cannot be transformed to assembly AST yet.")
 
-def lower_function_definition(func_def: IRFunctionDefinition):
+def lower_function_definition(func_def: IRFunctionDefinition) -> AsmFunctionDef:
     param_regs = AsmRegs.system_v_argument_regs()
     asm_instructions = []
     for reg, param in zip(param_regs, func_def.params):
-        asm_instructions.append(AsmMov(AsmReg(reg), lower_operand(IRVar(param))))
-    for i, param in enumerate(func_def.params[len(param_regs):]):
-        asm_instructions.append(AsmMov(AsmStack(16 + i*8), lower_operand(IRVar(param))))
+        param_type = lower_operand_type(IRVar(param))
+        asm_instructions.append(
+            AsmMov(
+                param_type, 
+                AsmReg(reg), 
+                AsmPseudo(param)
+            )
+        )
+
+    stack_params = func_def.params[len(param_regs):]
+    for i, param in enumerate(stack_params):
+        param_type = lower_operand_type(IRVar(param))
+        asm_instructions.append(
+            AsmMov(
+                param_type, 
+                AsmStack(16 + i*8), 
+                AsmPseudo(param)
+            )
+        )
         
     for instruction in func_def.body:
         asm_instructions += lower_instr(instruction)
     return AsmFunctionDef(func_def.name, func_def.global_, asm_instructions)
 
-def lower_instr(ast_node):
-    match ast_node:
+def lower_instr(instruction: IRInstruction) -> List[AsmInstruction]:
+    match instruction:
         case IRReturn(val):
-            val = lower_operand(val)
-            return [AsmMov(val, AsmReg(AsmRegs.AX)), 
-                    AsmRet()]
+            return lower_return(val)
         case IRUnary(unop, src, dst):
             return lower_unary(unop, src, dst)
         case IRBinary(binop, src1, src2, dst):
@@ -56,90 +72,129 @@ def lower_instr(ast_node):
         case IRJump(target):
             return [AsmJmp(target)]
         case IRJumpIfZero(condition, target):
-            return [AsmCmp(AsmImm(0), lower_operand(condition)),
+            return [AsmCmp(lower_operand_type(condition), AsmImm(0), lower_operand(condition)),
                     AsmJmpCC(AsmCondCode.E, target)]
         case IRJumpIfNotZero(condition, target):
-            return [AsmCmp(AsmImm(0), lower_operand(condition)),
+            return [AsmCmp(lower_operand_type(condition), AsmImm(0), lower_operand(condition)),
                     AsmJmpCC(AsmCondCode.NE, target)]
         case IRCopy(src, dst):
-            return [AsmMov(lower_operand(src), lower_operand(dst))]
+            return [AsmMov(lower_operand_type(src), lower_operand(src), lower_operand(dst))]
         case IRLabel(identifier):
             return [AsmLabel(identifier)]
         case IRFunCall(fun_name, args, dst):
             return lower_fun_call(fun_name, args, dst)
+        case IRSignExtend(src, dst):
+            return [AsmMovsx(lower_operand(src), lower_operand(dst))]
+        case IRTruncate(src, dst):
+            return [AsmMov(
+                        AssemblyType.Longword, 
+                        lower_operand(src), 
+                        lower_operand(dst)
+                    )]
         case _:
-            raise NotImplementedError(f"IR object {ast_node} can not be transformed to assembly AST yet.")
+            raise NotImplementedError(f"IR instruction {instruction} can not be transformed to assembly AST yet.")
+    
+def lower_return(ir_val: IRVal) -> List[AsmInstruction]:
+    val = lower_operand(ir_val)
+    return [AsmMov(
+                lower_operand_type(ir_val), 
+                val, 
+                AsmReg(AsmRegs.AX)
+            ), 
+            AsmRet()]
         
-def lower_fun_call(fun_name, args: List[IRVal], dst):
+def lower_fun_call(fun_name: str, args: List[IRVal], dst: IRVal) -> List[AsmInstruction]:
     arg_registers = AsmRegs.system_v_argument_regs()
     instructions = []
     register_args, stack_args = args[:6], args[6:]
     stack_padding = 0
     if len(stack_args) % 2 == 1:
         stack_padding = 8
+        instructions.append(AsmBinary(AsmBinaryOperator.Sub, AssemblyType.Quadword, AsmImm(stack_padding), AsmReg(AsmRegs.SP)))
 
-    if stack_padding != 0:
-        instructions.append(AsmAllocateStack(stack_padding))
-
-    reg_index = 0
-    for tacky_arg in register_args:
-        r = arg_registers[reg_index]
-        assembly_arg = lower_operand(tacky_arg)
-        instructions.append(AsmMov(assembly_arg, AsmReg(r)))
-        reg_index += 1
+    for tacky_arg, reg in zip(register_args, arg_registers):
+        assembly_arg, arg_type = lower_operand(tacky_arg), lower_operand_type(tacky_arg)
+        instructions.append(AsmMov(arg_type, assembly_arg, AsmReg(reg)))
 
     for tacky_arg in stack_args[::-1]:
         assembly_arg = lower_operand(tacky_arg)
-        if isinstance(assembly_arg, AsmImm) or isinstance(assembly_arg, AsmReg): #Always true?
+        if (isinstance(assembly_arg, AsmImm) or 
+            isinstance(assembly_arg, AsmReg) or 
+            lower_operand_type(tacky_arg) == AssemblyType.Quadword):
             instructions.append(AsmPush(assembly_arg))
         else:
-            instructions.extend([AsmMov(assembly_arg, AsmReg(AsmRegs.AX)),
+            instructions.extend([AsmMov(AssemblyType.Longword, assembly_arg, AsmReg(AsmRegs.AX)),
                                  AsmPush(AsmReg(AsmRegs.AX))])
     instructions.append(AsmCall(fun_name))
 
     bytes_to_remove = 8 * len(stack_args) + stack_padding
     if bytes_to_remove != 0:
-        instructions.append(AsmDeallocateStack(bytes_to_remove))
+        instructions.append(AsmBinary(AsmBinaryOperator.Add, AssemblyType.Quadword, AsmImm(bytes_to_remove), AsmReg(AsmRegs.SP)))
 
     assembly_dst = lower_operand(dst)
-    instructions.append(AsmMov(AsmReg(AsmRegs.AX), assembly_dst))
+    instructions.append(AsmMov(lower_operand_type(dst), AsmReg(AsmRegs.AX), assembly_dst))
     return instructions
 
-def lower_unary(unop, src, dst):
-    src, dst = lower_operand(src), lower_operand(dst)
+def lower_unary(unop, ir_src, ir_dst):
+    src, src_type, dst = lower_operand(ir_src), lower_operand_type(ir_src), lower_operand(ir_dst)
     match unop:
         case IRUnaryOperator.Not:
-            return [AsmCmp(AsmImm(0), src),
-                    AsmMov(AsmImm(0), dst),
+            return [AsmCmp(src_type, AsmImm(0), src),
+                    AsmMov(lower_operand_type(ir_dst), AsmImm(0), dst),
                     AsmSetCC(AsmCondCode.E, dst)]
         case _:
-            return [AsmMov(src, dst), 
-                    AsmUnary(lower_operator(unop), dst)]
+            return [AsmMov(src_type, src, dst), 
+                    AsmUnary(lower_operator(unop), src_type, dst)]
 
         
-def lower_binary(binop, src1, src2, dst):
-    src1, src2, dst = lower_operand(src1), lower_operand(src2), lower_operand(dst)
+def lower_binary(binop, ir_src1, ir_src2, ir_dst):
+    src1, src2, dst = lower_operand(ir_src1), lower_operand(ir_src2), lower_operand(ir_dst)
+    src1_type = lower_operand_type(ir_src1)
     match binop:
         case IRBinaryOperator.Divide:
             dividend_reg = AsmReg(AsmRegs.AX)
-            return [AsmMov(src1, dividend_reg),
-                    AsmCdq(),
-                    AsmIdiv(src2),
-                    AsmMov(dividend_reg, dst)]
+            return [AsmMov(src1_type, src1, dividend_reg),
+                    AsmCdq(src1_type),
+                    AsmIdiv(src1_type, src2),
+                    AsmMov(src1_type, dividend_reg, dst)]
         case IRBinaryOperator.Remainder:
-            return [AsmMov(src1, AsmReg(AsmRegs.AX)),
-                    AsmCdq(),
-                    AsmIdiv(src2),
-                    AsmMov(AsmReg(AsmRegs.DX), dst)]
+            return [AsmMov(src1_type, src1, AsmReg(AsmRegs.AX)),
+                    AsmCdq(src1_type),
+                    AsmIdiv(src1_type, src2),
+                    AsmMov(src1_type, AsmReg(AsmRegs.DX), dst)]
         case relational if binop.is_relational:
             relational = lower_relational(relational)
-            return [AsmCmp(src2, src1),
-                    AsmMov(AsmImm(0), dst),
+            return [AsmCmp(src1_type, src2, src1),
+                    AsmMov(lower_operand_type(ir_dst), AsmImm(0), dst),
                     AsmSetCC(relational, dst)]
+        case arithmetic if binop.is_arithmetic:
+            binop = lower_operator(arithmetic)
+            return [AsmMov(src1_type, src1, dst),
+                    AsmBinary(binop, src1_type, src2, dst)]
         case _:
-            binop = lower_operator(binop)
-            return [AsmMov(src1, dst),
-                    AsmBinary(binop, src2, dst)]
+            raise RuntimeError(f"Compiler error, cannot lower binary {binop}")
+
+def lower_operand_type(operand: IRVal):
+    match operand:
+        case IRConstant(ConstInt()):
+            return AssemblyType.Longword
+        case IRConstant(ConstLong()):
+            return AssemblyType.Quadword
+        case IRVar(identifier) if symbol_table[identifier].type == Int():
+            return AssemblyType.Longword
+        case IRVar(identifier) if symbol_table[identifier].type == Long():
+            return AssemblyType.Quadword
+        case _:
+            raise RuntimeError(f"Compiler error, cannot determine type of {operand}")
+
+def get_type_alignment(type: Type):
+    match type:
+        case Int():
+            return 4
+        case Long():
+            return 8
+        case _:
+            RuntimeError(f"Compiler error, cannot determine alignment of type {type}")
 
 def lower_relational(ast_node):
     try:
@@ -153,10 +208,10 @@ def lower_operator(ast_node):
     except KeyError:
         raise NotImplementedError(f"IR operator object {ast_node} cannot be transformed to assembly AST yet.")
 
-def lower_operand(ast_node):
+def lower_operand(ast_node: IRVal):
     match ast_node:
         case IRConstant(constant):
-            return AsmImm(constant)
+            return AsmImm(constant.int)
         case IRVar(identifier):
             return AsmPseudo(identifier)
         case _:
