@@ -93,14 +93,6 @@ class AsmLabel(AsmInstruction):
     identifier: str
     
 @dataclass
-class AsmAllocateStack(AsmInstruction):
-    int: int
-
-@dataclass
-class AsmDeallocateStack(AsmInstruction):
-    int: int
-
-@dataclass
 class AsmPush(AsmInstruction):
     operand: AsmOperand
 
@@ -114,13 +106,13 @@ class AsmRet(AsmInstruction):
 
 
 class AsmUnaryOperator(Enum):
-    Neg = "negl"
-    Not = "notl"
+    Neg = "neg"
+    Not = "not"
 
 class AsmBinaryOperator(Enum):
-    Add = "addl"
-    Sub = "subl"
-    Mult = "imull"
+    Add = "add"
+    Sub = "sub"
+    Mult = "imul"
 
 
 

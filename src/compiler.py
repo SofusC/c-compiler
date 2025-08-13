@@ -29,6 +29,7 @@ def compile_c(file, flag):
             assembly_code = code_emitter.emit_program_code(asm)
             f.write(assembly_code)
 
+    #TODO: This is not printed when an error is raised
     if flag == "lex":
         [print(token) for token in tokens]
     elif flag == "parse":
@@ -46,6 +47,8 @@ def compile_c(file, flag):
     elif flag == "testall":
         print("C AST:")
         pretty_printer.printer(ast)
+        print("Validated C AST:")
+        pretty_printer.printer(analysed_ast)
         print("Tacky AST:")
         pretty_printer.printer(emitted_ir)
         print("Assembly AST:")

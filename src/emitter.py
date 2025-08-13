@@ -3,7 +3,7 @@ from .c_ast import *
 from .utils import NameGenerator, log
 from copy import deepcopy
 from typing import Any, List, Optional
-from .semantic_analysis.typechecker import symbol_table, StaticAttr, Initial, Tentative, NoInitializer, get_type, SymbolEntry, LocalAttr
+from .semantic_analysis.typechecker import symbol_table, StaticAttr, Initial, Tentative, NoInitializer, get_type, SymbolEntry, LocalAttr, IntInit, LongInit
 
 
 _UNOP_MAP = {
@@ -345,9 +345,9 @@ def convert_symbols_to_tacky():
                 value = value
             case Tentative():
                 if type_ == Int():
-                    value = ConstInt(0) 
+                    value = IntInit(0) 
                 elif type_ == Long(): 
-                    value = ConstLong(0)
+                    value = LongInit(0)
                 else:
                     raise RuntimeError(f"Compiler error, cant convert to tacky symbol for {type_}")
             case NoInitializer():

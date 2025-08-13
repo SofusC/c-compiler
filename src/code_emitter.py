@@ -1,6 +1,6 @@
 from .assembly_ast import *
-from .semantic_analysis.typechecker import symbol_table
-from .asm_allocator import INT_SIZE
+from .semantic_analysis.typechecker import IntInit, LongInit
+from .asm_allocator import backend_symbol_table
 
 def emit_program_code(program):
     res = []
@@ -32,43 +32,55 @@ def emit_function(func_def):
             res.append("   " + lines)
     return res
 
-def emit_static_var(static_var):
+def emit_static_var(static_var: AsmStaticVar):
     res = []
     if static_var.global_:
         res.append(f"   .globl {static_var.name}")
         
-    section = ".data" if static_var.init != 0 else ".bss"
+    section = ".data" if static_var.init.int != 0 else ".bss"
     res.append(f"   {section}")
 
-    res.append(f"   .align 4")
+    res.append(f"   .align {static_var.alignment}")
     res.append(f"{static_var.name}:")
     
-    init_line = f"   .long {static_var.init}" if static_var.init != 0 else f"   .zero {INT_SIZE}"
+    match static_var.init:
+        case IntInit(0):
+            init_line = f"   .zero 4"
+        case IntInit(i):
+            init_line = f"   .long {i}"
+        case LongInit(0):
+            init_line = f"   .zero 8"
+        case LongInit(i):
+            init_line = f"   .quad {i}"
+        case _:
+            raise RuntimeError(f"Compiler error, cannot emit code for {static_var.init}")
     res.append(init_line)
     return res
         
 def emit_instruction(ast_node):
     match ast_node:
-        case AsmMov(src, dst):
-            return f"movl   {emit_operand(src)}, {emit_operand(dst)}"
+        case AsmMov(t, src, dst):
+            return f"mov{t.value}   {emit_operand(src, t.value)}, {emit_operand(dst, t.value)}"
         case AsmRet():
             return [
                 f"movq   %rbp, %rsp",
                 f"popq   %rbp",
                 f"ret"
             ]
-        case AsmUnary(unop, operand):
-            return f"{unop.value}   {emit_operand(operand)}"
-        case AsmBinary(binop, src, dst):
-            return f"{binop.value}   {emit_operand(src)}, {emit_operand(dst)}"
-        case AsmIdiv(operand):
-            return f"idivl  {emit_operand(operand)}"
-        case AsmCdq():
+        case AsmMovsx(src, dst):
+            return f"movslq   {emit_operand(src, 'l')}, {emit_operand(dst, 'q')}"
+        case AsmUnary(unop, t, operand):
+            return f"{unop.value}{t.value}   {emit_operand(operand, t.value)}"
+        case AsmBinary(binop, t, src, dst):
+            return f"{binop.value}{t.value}   {emit_operand(src, t.value)}, {emit_operand(dst, t.value)}"
+        case AsmIdiv(t, operand):
+            return f"idiv{t.value}  {emit_operand(operand, t.value)}"
+        case AsmCdq(AssemblyType.Longword):
             return f"cdq"
-        case AsmAllocateStack(size):
-            return f"subq   ${size},  %rsp"
-        case AsmCmp(op1, op2):
-            return f"cmpl   {emit_operand(op1)}, {emit_operand(op2)}"
+        case AsmCdq(AssemblyType.Quadword):
+            return f"cqo"
+        case AsmCmp(t, op1, op2):
+            return f"cmp{t.value}   {emit_operand(op1, t.value)}, {emit_operand(op2, t.value)}"
         case AsmJmp(label):
             return f"jmp    .L{label}"
         case AsmJmpCC(cc, label):
@@ -77,24 +89,22 @@ def emit_instruction(ast_node):
             return f"set{cc.value}  {emit_operand(operand, 'byte')}"
         case AsmLabel(label):
             return f".L{label}:"
-        case AsmDeallocateStack(size):
-            return f"addq   ${size}, %rsp"
         case AsmPush(operand):
-            return f"pushq   {emit_operand(operand, 'qword')}"
+            return f"pushq   {emit_operand(operand, 'q')}"
         case AsmCall(func):
-            suffix = "@PLT" if func in symbol_table else ""
+            suffix = "@PLT" if func in backend_symbol_table else ""
             return f"call   {func}{suffix}"
         case _:
             raise NotImplementedError(f"Can't generate assembly code for {ast_node}")
 
-def emit_operand(operand, size = "dword"):
+def emit_operand(operand, size):
     match operand:
         case AsmReg(reg):
             if size == "byte":
                 return reg.as_byte()
-            if size == "dword":
+            if size == "l":
                 return reg.as_dword()
-            if size == "qword":
+            if size == "q":
                 return reg.as_qword()
         case AsmStack(offset):
             return f"{offset}(%rbp)"

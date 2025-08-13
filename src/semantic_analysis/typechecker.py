@@ -139,8 +139,8 @@ def typecheck_local_variable_declaration(var_decl: VariableDeclaration):
             type = type_,
             attrs = LocalAttr())
         if init is not None:
-            typecheck_exp(init)
-            set_type(init, type_)
+            typecheck_exp(var_decl.init)
+            var_decl.init = convert_to(var_decl.init, type_)
     
 @log
 def typecheck_for_init_decl(decl: VariableDeclaration):
