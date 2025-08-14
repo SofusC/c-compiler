@@ -1,7 +1,7 @@
 from .ir_ast import *
 from .assembly_ast import *
 from .c_ast import ConstInt, ConstLong, Int, Long
-from .semantic_analysis.typechecker import symbol_table
+from .semantic_analysis.symbol_table import symbol_table
 
 _RELATIONAL_MAP = {
     IRBinaryOperator.Equal          : AsmCondCode.E,

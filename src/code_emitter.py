@@ -1,5 +1,5 @@
 from .assembly_ast import *
-from .semantic_analysis.typechecker import IntInit, LongInit
+from .semantic_analysis.symbol_table import IntInit, LongInit
 from .asm_allocator import backend_symbol_table
 
 def emit_program_code(program):

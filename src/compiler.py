@@ -21,7 +21,7 @@ def compile_c(file, flag):
 
     if flag in ["codegen", "all", "testall", "c"]:
         asm = asm_generator.lower_program(emitted_ir)
-        asm_allocator.AsmAllocator().legalize(asm)
+        asm_allocator.legalize(asm)
 
     if flag in ["all", "testall", "c"]:
         output = file[:-2] + ".s"
