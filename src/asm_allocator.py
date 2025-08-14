@@ -13,7 +13,7 @@ MAX_ITER = 100
 identifiers: Dict[str, int] = {}
 stack_counter: int = 0
 
-class BackendSymEntry():
+class BackendSymEntry:
     pass
 
 @dataclass
