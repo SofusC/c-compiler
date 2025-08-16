@@ -51,11 +51,15 @@ class Type(ASTNode):
 
 @dataclass(frozen = True)
 class Int(Type):
-    pass
+    BIT_WIDTH = 32
+    MAX_VALUE = 2**(BIT_WIDTH - 1) - 1
+    RANGE = 2**BIT_WIDTH
 
 @dataclass(frozen = True)
 class Long(Type): 
-    pass
+    BIT_WIDTH = 64
+    MAX_VALUE = 2**(BIT_WIDTH - 1) - 1
+    RANGE = 2**BIT_WIDTH
 
 @dataclass(frozen = True)
 class FunType(Type):

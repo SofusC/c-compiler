@@ -220,7 +220,7 @@ def static_type_conversion(value: int, to_type):
     if not isinstance(to_type, Int):
         raise RuntimeError(f"Compiler error: cannot statically convert to type {to_type}")
 
-    return ((value + 2**31) % 2**32) - 2**31
+    return ((value + Int.RANGE//2) % Int.RANGE) - Int.RANGE//2
 
 @log
 def resolve_const_init(constant: Constant):

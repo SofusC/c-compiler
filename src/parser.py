@@ -233,9 +233,9 @@ class Parser:
 
     def parse_constant(self, token):
         value = int(token.value)
-        if value > 2**63 - 1:
+        if value > Long.MAX_VALUE:
             raise RuntimeError(f"Constant in token: {token} is too large for int or long")
-        if token.token_type == TokenType.CONSTANT and value <= 2**31 - 1:
+        if token.token_type == TokenType.CONSTANT and value <= Int.MAX_VALUE:
             return ConstInt(value)
         return ConstLong(value)
     
