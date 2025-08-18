@@ -119,9 +119,9 @@ def typecheck_variable(var: Var):
 def typecheck_constant(constant: Constant):
     match constant.constant:
         case ConstInt(i):
-            set_type(constant, Int())
+            set_type(constant, Int)
         case ConstLong(l):
-            set_type(constant, Long())
+            set_type(constant, Long)
 
 @log
 def typecheck_cast(cast: Cast):
@@ -132,7 +132,7 @@ def typecheck_cast(cast: Cast):
 def typecheck_unary(unary: Unary):
     typecheck_exp(unary.exp)
     if unary.unary_operator.is_logical:
-        set_type(unary, Int())
+        set_type(unary, Int)
     else:
         set_type(unary, get_type(unary.exp))
 
@@ -141,7 +141,7 @@ def typecheck_binary(binary: Binary):
     typecheck_exp(binary.left_exp)
     typecheck_exp(binary.right_exp)
     if binary.binary_operator.is_logical:
-        set_type(binary, Int())
+        set_type(binary, Int)
         return
     t1 = get_type(binary.left_exp)
     t2 = get_type(binary.right_exp)
@@ -151,7 +151,7 @@ def typecheck_binary(binary: Binary):
     if binary.binary_operator.is_arithmetic:
         set_type(binary, common_type)
     else:
-        set_type(binary, Int())
+        set_type(binary, Int)
     
 @log
 def typecheck_assignment(assignment: Assignment):
@@ -205,7 +205,7 @@ def get_common_type(type1: Type, type2: Type):
     if type1 == type2:
         return type1
     else:
-        return Long()
+        return Long
     
 @log
 def convert_to(exp: Exp, type: Type):
@@ -217,7 +217,7 @@ def convert_to(exp: Exp, type: Type):
 
 @log 
 def static_type_conversion(value: int, to_type):
-    if not isinstance(to_type, Int):
+    if to_type is not Int:
         raise RuntimeError(f"Compiler error: cannot statically convert to type {to_type}")
 
     return ((value + Int.RANGE//2) % Int.RANGE) - Int.RANGE//2
@@ -226,7 +226,7 @@ def static_type_conversion(value: int, to_type):
 def resolve_const_init(constant: Constant):
     match constant.constant:
         case ConstInt(i):
-            initial_value = Initial(IntInit(static_type_conversion(i, Int())))
+            initial_value = Initial(IntInit(static_type_conversion(i, Int)))
         case ConstLong(l):
             initial_value = Initial(LongInit(l))
         case _:

@@ -106,9 +106,9 @@ def emit_cast(instructions: List[IRInstruction], target_type: Type, inner_exp: E
     if target_type == get_type(inner_exp):
         return result
     dst = make_tacky_variable(target_type)
-    if target_type == Long():
+    if target_type is Long:
         instructions.append(IRSignExtend(result, dst))
-    elif target_type == Int():
+    elif target_type is Int:
         instructions.append(IRTruncate(result, dst))
     else:
         raise RuntimeError(f"Compiler error, cant emit for cast to type {target_type}")
@@ -345,9 +345,9 @@ def convert_symbols_to_tacky():
             case Initial(value):
                 value = value
             case Tentative():
-                if type_ == Int():
+                if type_ is Int:
                     value = IntInit(0) 
-                elif type_ == Long(): 
+                elif type_ is Long: 
                     value = LongInit(0)
                 else:
                     raise RuntimeError(f"Compiler error, cant convert to tacky symbol for {type_}")

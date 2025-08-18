@@ -82,7 +82,7 @@ def _large_immediate_value(instruction: AsmInstruction) -> List[AsmInstruction]:
         
 def _quadword_in_movl(instruction: AsmMov) -> List[AsmInstruction]:
     val, dst = instruction.src.int, instruction.dst
-    return [AsmMov(AssemblyType.Longword, AsmImm(static_type_conversion(val, Int())), dst)]
+    return [AsmMov(AssemblyType.Longword, AsmImm(static_type_conversion(val, Int)), dst)]
 
 
 def _is_memory_operand(operand: AsmOperand) -> bool:
@@ -198,8 +198,8 @@ def _to_backend_entry(sym_entry: SymbolEntry):
 
     if isinstance(sym_type, FunType):
         return FunEntry(sym_entry.attrs.defined)
-    elif isinstance(sym_type, (Int, Long)):
-        assem_type = AssemblyType.Longword if isinstance(sym_type, Int) else AssemblyType.Quadword
+    elif sym_type is Int or sym_type is Long:
+        assem_type = AssemblyType.Longword if sym_type is Int else AssemblyType.Quadword
         is_static = isinstance(sym_entry.attrs, StaticAttr)
         return ObjEntry(assem_type, is_static)
     else:

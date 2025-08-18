@@ -278,9 +278,9 @@ class Parser:
     def parse_type(self, tokens):
         types = [t.token_type for t in tokens]
         if types == [TokenType.INT]:
-            return Int()
+            return Int
         if types == [TokenType.INT, TokenType.LONG] or types == [TokenType.LONG, TokenType.INT] or types == [TokenType.LONG]:
-            return Long()
+            return Long
         raise RuntimeError(f"Invalid type specifier {types}")
 
     def parse_optional_exp(self, end_symbol) -> Exp | None:

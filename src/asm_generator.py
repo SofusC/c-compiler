@@ -180,21 +180,21 @@ def lower_operand_type(operand: IRVal):
             return AssemblyType.Longword
         case IRConstant(ConstLong()):
             return AssemblyType.Quadword
-        case IRVar(identifier) if symbol_table[identifier].type == Int():
+        case IRVar(identifier) if symbol_table[identifier].type is Int:
             return AssemblyType.Longword
-        case IRVar(identifier) if symbol_table[identifier].type == Long():
+        case IRVar(identifier) if symbol_table[identifier].type is Long:
             return AssemblyType.Quadword
         case _:
             raise RuntimeError(f"Compiler error, cannot determine type of {operand}")
 
 def get_type_alignment(type: Type):
     match type:
-        case Int():
+        case _ if type is Int:
             return 4
-        case Long():
+        case _ if type is Long:
             return 8
         case _:
-            RuntimeError(f"Compiler error, cannot determine alignment of type {type}")
+            raise RuntimeError(f"Compiler error, cannot determine alignment of type {type}")
 
 def lower_relational(ast_node):
     try:

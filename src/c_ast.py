@@ -49,17 +49,19 @@ class FunctionDeclaration(ASTNode):
 class Type(ASTNode): 
     pass
 
-@dataclass(frozen = True)
-class Int(Type):
-    BIT_WIDTH = 32
-    MAX_VALUE = 2**(BIT_WIDTH - 1) - 1
-    RANGE = 2**BIT_WIDTH
+class IntegerType(Type):
+    BIT_WIDTH: int
 
-@dataclass(frozen = True)
-class Long(Type): 
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        cls.MAX_VALUE = 2**(cls.BIT_WIDTH - 1) - 1
+        cls.RANGE = 2**cls.BIT_WIDTH
+
+class Int(IntegerType):
+    BIT_WIDTH = 32
+
+class Long(IntegerType): 
     BIT_WIDTH = 64
-    MAX_VALUE = 2**(BIT_WIDTH - 1) - 1
-    RANGE = 2**BIT_WIDTH
 
 @dataclass(frozen = True)
 class FunType(Type):
