@@ -1,21 +1,32 @@
-from . import pretty_printer
-from . import lexer
-from . import parser
-from . import emitter
-from . import asm_generator
-from . import asm_allocator
-from . import code_emitter
+import sys, os, click
+from . import pretty_printer, lexer, parser, emitter, asm_generator, asm_allocator, code_emitter
 from .semantic_analysis.semantic_analyser import validate_program
+from .compiler_stages import CompilerStage
+from .gcc_runner import preprocess, assemble, assemble_object
 
-"""
+def run_compiler(input_files, stage):
+    for file in input_files:
+        preprocessed = None
+        try:
+            preprocessed = preprocess(file)
+            compiled = compile_c(preprocessed, stage)
+            if stage in [CompilerStage.ALL, CompilerStage.TESTALL]:
+                assemble(compiled)
+            if stage == CompilerStage.C:
+                assemble_object(compiled)
+        except RuntimeError as err:
+            click.echo(f"Error: {err}", err=True)
+            sys.exit(1)
+        finally:
+            if preprocessed and os.path.exists(preprocessed):
+                os.remove(preprocessed)
+
 def compile_c(file, flag):
     tokens = lexer.lex(file)
     if flag == CompilerStage.LEX:
         [print(token) for token in tokens]
         return
-    print(flag)
-    print(CompilerStage.PARSE)
-    print(flag == CompilerStage.PARSE)
+    
     c_ast = parser.Parser(tokens).parse_program()
     if flag == CompilerStage.PARSE:
         print("C AST:")
@@ -51,4 +62,3 @@ def compile_c(file, flag):
     #    print(assembly_code)
     
     return output
-"""
