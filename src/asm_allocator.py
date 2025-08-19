@@ -6,7 +6,8 @@ from typing import List, Dict
 
 TMP_REG_1 = AsmReg(AsmRegs.R10)
 TMP_REG_2 = AsmReg(AsmRegs.R11)
-INT_SIZE = 4
+LONGWORD_SIZE = 4
+QUADWORD_SIZE = 8
 STACK_ALIGNMENT = 16
 MAX_ITER = 100
 
@@ -89,7 +90,7 @@ def _is_memory_operand(operand: AsmOperand) -> bool:
     return isinstance(operand, (AsmStack, AsmData))
 
 def _in_range_of_int(number: int) -> bool:
-    return -2**31 <= number and number <= 2**31-1
+    return Int.MIN_VALUE <= number and number <= Int.MAX_VALUE
 
 def _two_mem_ops(src: AsmOperand, dst: AsmOperand) -> bool:
         return _is_memory_operand(src) and _is_memory_operand(dst)
@@ -160,14 +161,14 @@ def _get_stack_slot(identifier: str) -> AsmOperand:
             return AsmData(identifier)
         
     if sym_entry.type == AssemblyType.Longword:
-        size = 4
+        size = LONGWORD_SIZE
     elif sym_entry.type == AssemblyType.Quadword:
-        size = 8
+        size = QUADWORD_SIZE
     else:
         raise RuntimeError(f"Compiler error, cant find size of type {sym_entry.type}")
     
     stack_counter -= size
-    if size == 8: # align quadword
+    if sym_entry.type == AssemblyType.Quadword: # align quadword
         stack_counter -= stack_counter % 8
 
     identifiers[identifier] = stack_counter

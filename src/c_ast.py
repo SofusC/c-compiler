@@ -54,6 +54,7 @@ class IntegerType(Type):
 
     def __init_subclass__(cls):
         super().__init_subclass__()
+        cls.MIN_VALUE = -2**(cls.BIT_WIDTH - 1)
         cls.MAX_VALUE = 2**(cls.BIT_WIDTH - 1) - 1
         cls.RANGE = 2**cls.BIT_WIDTH
 

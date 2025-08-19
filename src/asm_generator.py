@@ -19,7 +19,12 @@ _OPERATOR_MAP = {
     IRBinaryOperator.Subtract       : AsmBinaryOperator.Sub,
     IRBinaryOperator.Multiply       : AsmBinaryOperator.Mult,
 }
-        
+
+SIZE_OF_RIP = 8
+SIZE_OF_RBP = 8
+SIZE_OF_PROLOGUE = SIZE_OF_RIP + SIZE_OF_RBP
+SIZE_OF_STACK_ARG = 8
+
 def lower_program(program: IRProgram) -> AsmProgram:
     toplevels = [lower_toplevel(toplevel) for toplevel in program.toplevels]
     return AsmProgram(toplevels)
@@ -52,7 +57,7 @@ def lower_function_definition(func_def: IRFunctionDefinition) -> AsmFunctionDef:
         asm_instructions.append(
             AsmMov(
                 param_type, 
-                AsmStack(16 + i*8), 
+                AsmStack(SIZE_OF_PROLOGUE + i*SIZE_OF_STACK_ARG), 
                 AsmPseudo(param)
             )
         )
@@ -107,33 +112,40 @@ def lower_fun_call(fun_name: str, args: List[IRVal], dst: IRVal) -> List[AsmInst
     arg_registers = AsmRegs.system_v_argument_regs()
     instructions = []
     register_args, stack_args = args[:6], args[6:]
-    stack_padding = 0
-    if len(stack_args) % 2 == 1:
-        stack_padding = 8
+
+    stack_padding = compute_stack_padding(stack_args)
+    if stack_padding:
         instructions.append(AsmBinary(AsmBinaryOperator.Sub, AssemblyType.Quadword, AsmImm(stack_padding), AsmReg(AsmRegs.SP)))
 
     for tacky_arg, reg in zip(register_args, arg_registers):
-        assembly_arg, arg_type = lower_operand(tacky_arg), lower_operand_type(tacky_arg)
+        assembly_arg, arg_type = lower_arg(tacky_arg)
         instructions.append(AsmMov(arg_type, assembly_arg, AsmReg(reg)))
 
     for tacky_arg in stack_args[::-1]:
-        assembly_arg = lower_operand(tacky_arg)
-        if (isinstance(assembly_arg, AsmImm) or 
-            isinstance(assembly_arg, AsmReg) or 
-            lower_operand_type(tacky_arg) == AssemblyType.Quadword):
-            instructions.append(AsmPush(assembly_arg))
+        operand, op_type = lower_arg(tacky_arg)
+        if can_push_directly(operand, op_type):
+            instructions.append(AsmPush(operand))
         else:
-            instructions.extend([AsmMov(AssemblyType.Longword, assembly_arg, AsmReg(AsmRegs.AX)),
+            instructions.extend([AsmMov(AssemblyType.Longword, operand, AsmReg(AsmRegs.AX)),
                                  AsmPush(AsmReg(AsmRegs.AX))])
     instructions.append(AsmCall(fun_name))
 
-    bytes_to_remove = 8 * len(stack_args) + stack_padding
-    if bytes_to_remove != 0:
+    bytes_to_remove = SIZE_OF_STACK_ARG * len(stack_args) + stack_padding
+    if bytes_to_remove:
         instructions.append(AsmBinary(AsmBinaryOperator.Add, AssemblyType.Quadword, AsmImm(bytes_to_remove), AsmReg(AsmRegs.SP)))
 
-    assembly_dst = lower_operand(dst)
-    instructions.append(AsmMov(lower_operand_type(dst), AsmReg(AsmRegs.AX), assembly_dst))
+    dst_operand, dst_type = lower_arg(dst)
+    instructions.append(AsmMov(dst_type, AsmReg(AsmRegs.AX), dst_operand))
     return instructions
+
+def compute_stack_padding(stack_args) -> int:
+    return SIZE_OF_STACK_ARG if len(stack_args) % 2 == 1 else 0
+
+def lower_arg(arg: IRVal) -> tuple[AsmOperand, AssemblyType]:
+    return lower_operand(arg), lower_operand_type(arg)
+
+def can_push_directly(op: AsmOperand, op_type: AssemblyType) -> bool:
+    return isinstance(op, (AsmImm, AsmReg)) or op_type == AssemblyType.Quadword
 
 def lower_unary(unop, ir_src, ir_dst):
     src, src_type, dst = lower_operand(ir_src), lower_operand_type(ir_src), lower_operand(ir_dst)

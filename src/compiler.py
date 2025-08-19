@@ -55,6 +55,9 @@ def compile_c(file, flag):
     output = file[:-2] + ".s"
     with open(output, "w") as f:
         assembly_code = code_emitter.emit_program_code(asm)
+        if flag == CompilerStage.ALL:
+            print("Assembly code:")
+            pretty_printer.printer(assembly_code)
         f.write(assembly_code)
 
     #if flag in ["all", "c"]:
