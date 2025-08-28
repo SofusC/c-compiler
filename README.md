@@ -10,6 +10,27 @@ This project is a simple C compiler implemented in Python. It parses, analyzes, 
 - Assembly code generation and register allocation
 - Integration with GCC for preprocessing, assembling, and linking
 
+- [x] Unary operators
+- [x] Binary operators
+- [ ] Bitwise operators
+- [x] Logical operators
+- [x] Relational operators
+- [x] Local variables
+- [x] If statements
+- [x] Conditional expressions
+- [x] Compound statements
+- [x] Loops
+- [x] Functions
+- [x] extern and static keywords
+- [x] Long integers
+- [ ] Unsigned integers
+- [ ] Floats
+- [ ] Pointers
+- [ ] Arrays
+- [ ] Chars
+- [ ] Strings
+
+
 ## Usage
 
 To compile a C file:
