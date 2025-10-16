@@ -6,7 +6,7 @@ from .c_ast import *
 @dataclass
 class Parser:
     tokens: List[Token] #TODO: Should probably be a deque
-    type_specifiers = [TokenType.INT, TokenType.LONG]
+    type_specifiers = [TokenType.INT, TokenType.LONG, TokenType.SIGNED, TokenType.UNSIGNED]
     specifiers = type_specifiers + [TokenType.EXTERN, TokenType.STATIC]
     PRECEDENCE = {
         TokenType.ASTERISK:             50,
@@ -205,6 +205,8 @@ class Parser:
         token = self.expect([
             TokenType.CONSTANT,
             TokenType.LONG_CONSTANT,
+            TokenType.UNSIGNED_INT_CONSTANT,
+            TokenType.UNSIGNED_LONG_CONSTANT,
             TokenType.TILDE, 
             TokenType.HYPHEN, 
             TokenType.EXCLAMATION_POINT, 
@@ -213,6 +215,8 @@ class Parser:
         match token.token_type:
             case TokenType.CONSTANT | TokenType.LONG_CONSTANT:
                 return Constant(self.parse_constant(token))
+            case TokenType.UNSIGNED_INT_CONSTANT | TokenType.UNSIGNED_LONG_CONSTANT:
+                return Constant(self.parse_unsigned_constant(token))
             case TokenType.TILDE | TokenType.HYPHEN | TokenType.EXCLAMATION_POINT as unop:
                 return Unary(self.unop_map[unop], self.parse_factor())
             case TokenType.OPEN_PAREN if self.peek().token_type in self.type_specifiers:
@@ -238,6 +242,14 @@ class Parser:
         if token.token_type == TokenType.CONSTANT and value <= Int.MAX_VALUE:
             return ConstInt(value)
         return ConstLong(value)
+    
+    def parse_unsigned_constant(self, token):
+        value = int(token.value)
+        if value > ULong.MAX_VALUE:
+            raise RuntimeError(f"Constant in token: {token} is too large for unsigned int or unsigned long")
+        if token.token_type == TokenType.UNSIGNED_INT_CONSTANT and value <= UInt.MAX_VALUE:
+            return ConstUInt(value)
+        return ConstULong(value)
     
     def parse_argument_list(self) -> List[Exp]:
         if self.next_token_is(TokenType.CLOSE_PAREN):
@@ -277,11 +289,25 @@ class Parser:
 
     def parse_type(self, tokens):
         types = [t.token_type for t in tokens]
-        if types == [TokenType.INT]:
-            return Int
-        if types == [TokenType.INT, TokenType.LONG] or types == [TokenType.LONG, TokenType.INT] or types == [TokenType.LONG]:
+        if not self.is_valid_type_list(types):
+            raise RuntimeError(f"Invalid type specifier list {types}")
+        if TokenType.UNSIGNED in types and TokenType.LONG in types:
+            return ULong
+        if TokenType.UNSIGNED in types:
+            return UInt
+        if TokenType.LONG in types:
             return Long
-        raise RuntimeError(f"Invalid type specifier {types}")
+        return Int
+    
+    def is_valid_type_list(self, types: List[TokenType]):
+        is_empty = lambda lst: len(lst) == 0
+        contains_duplicates = lambda lst: len(lst) != len(set(lst))
+        contains_signed_and_unsigned = lambda lst: TokenType.SIGNED in lst and TokenType.UNSIGNED in lst
+        if (is_empty(types) 
+            or contains_duplicates(types) 
+            or contains_signed_and_unsigned(types)):
+            return False
+        return True
 
     def parse_optional_exp(self, end_symbol) -> Exp | None:
         if not self.next_token_is(end_symbol):

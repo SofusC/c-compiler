@@ -49,7 +49,7 @@ class FunctionDeclaration(ASTNode):
 class Type(ASTNode): 
     pass
 
-class IntegerType(Type):
+class SignedType(Type):
     BIT_WIDTH: int
 
     def __init_subclass__(cls):
@@ -58,11 +58,27 @@ class IntegerType(Type):
         cls.MAX_VALUE = 2**(cls.BIT_WIDTH - 1) - 1
         cls.RANGE = 2**cls.BIT_WIDTH
 
-class Int(IntegerType):
+class Int(SignedType):
     BIT_WIDTH = 32
 
-class Long(IntegerType): 
+class Long(SignedType): 
     BIT_WIDTH = 64
+
+class UnsignedType(Type):
+    BIT_WIDTH: int
+
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        cls.MIN_VALUE = 0
+        cls.MAX_VALUE = 2**(cls.BIT_WIDTH) - 1
+        cls.RANGE = 2**cls.BIT_WIDTH
+
+class UInt(UnsignedType):
+    BIT_WIDTH = 32
+
+class ULong(UnsignedType):
+    BIT_WIDTH = 64
+
 
 @dataclass(frozen = True)
 class FunType(Type):
@@ -254,3 +270,10 @@ class ConstInt(Const):
 class ConstLong(Const):
     int: int
     
+@dataclass
+class ConstUInt(Const):
+    int: int
+    
+@dataclass
+class ConstULong(Const):
+    int: int

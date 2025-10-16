@@ -70,6 +70,31 @@ class Token:
     token_type: TokenType
     value: str | int | None = None
 
+    def __post_init__(self):
+        numeric_constants = {
+            TokenType.CONSTANT,
+            TokenType.LONG_CONSTANT,
+            TokenType.UNSIGNED_INT_CONSTANT,
+            TokenType.UNSIGNED_LONG_CONSTANT,
+        }
+
+        if self.token_type in numeric_constants:
+            if self.value is None:
+                raise ValueError(f"{self.token_type.name} token requires a value.")
+            try:
+                self.value = int(self.value)
+            except (ValueError, TypeError):
+                raise TypeError(
+                    f"{self.token_type.name} value must be int or coercible to int, got {type(self.value).__name__}: {self.value!r}"
+                )
+        elif self.token_type == TokenType.IDENTIFIER:
+            if not isinstance(self.value, str):
+                raise TypeError(f"IDENTIFIER value must be str, got {type(self.value).__name__}.")
+        else:
+            if self.value is not None:
+                raise ValueError(f"{self.token_type.name} should not have a value.")
+
+
     def __str__(self):
         if self.value:
             return f"Token of type {self.token_type.name} with value {self.value}"
@@ -89,8 +114,11 @@ def lex(file):
                 case TokenType.IDENTIFIER.name | TokenType.CONSTANT.name:
                     value = mo.group()
                     result.append(Token(TokenType[token], value))
-                case TokenType.LONG_CONSTANT.name:
+                case TokenType.LONG_CONSTANT.name | TokenType.UNSIGNED_INT_CONSTANT.name:
                     value = mo.group()[:-1]
+                    result.append(Token(TokenType[token], value))
+                case TokenType.UNSIGNED_LONG_CONSTANT.name:
+                    value = mo.group()[:-2]
                     result.append(Token(TokenType[token], value))
                 case _:
                     result.append(Token(TokenType[token]))
