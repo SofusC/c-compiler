@@ -20,6 +20,8 @@ def print_list(list, level = 0):
 def get_attr_values(obj):
     if is_dataclass(obj):
         return [getattr(obj, f.name) for f in fields(obj)]
+    elif isinstance(obj, type):
+        return [repr(obj)]
     elif hasattr(obj, "__dict__"):
         return list(obj.__dict__.values())
     else:

@@ -1,3 +1,4 @@
+from collections import deque
 import sys, os, click
 from . import pretty_printer, lexer, parser, emitter, asm_generator, asm_allocator, code_emitter
 from .semantic_analysis.semantic_analyser import validate_program
@@ -27,7 +28,7 @@ def compile_c(file, flag):
         [print(token) for token in tokens]
         return
     
-    c_ast = parser.Parser(tokens).parse_program()
+    c_ast = parser.Parser(deque(tokens)).parse_program()
     if flag == CompilerStage.PARSE:
         print("C AST:")
         pretty_printer.printer(c_ast)

@@ -2,10 +2,11 @@ from .lexer import TokenType, Token
 from dataclasses import dataclass
 from typing import List, Iterable
 from .c_ast import *
+from collections import deque
 
 @dataclass
 class Parser:
-    tokens: List[Token] #TODO: Should probably be a deque
+    tokens: deque[Token]
     type_specifiers = [TokenType.INT, TokenType.LONG, TokenType.SIGNED, TokenType.UNSIGNED]
     specifiers = type_specifiers + [TokenType.EXTERN, TokenType.STATIC]
     PRECEDENCE = {
@@ -55,7 +56,7 @@ class Parser:
 
     def parse_declaration(self) -> Declaration:
         type, storage_class = self.parse_type_and_storage_class()
-        if self.tokens[1].token_type == TokenType.OPEN_PAREN:
+        if self.peek(1).token_type == TokenType.OPEN_PAREN:
             return FunDecl(self.parse_function_declaration(type, storage_class))
         else:
             return VarDecl(self.parse_variable_declaration(type, storage_class))
@@ -99,37 +100,42 @@ class Parser:
 
     def parse_statement(self) -> Statement:
         match self.peek().token_type:
-            case TokenType.RETURN:
-                self.advance()
-                exp = self.parse_exp()
-                self.expect(TokenType.SEMICOLON)
-                return Return(exp)
-            case TokenType.SEMICOLON:
-                self.advance()
-                return Null()
-            case TokenType.IF:
-                return self.parse_if()
-            case TokenType.OPEN_BRACE:
-                return Compound(self.parse_block())
-            case TokenType.BREAK:
-                self.advance()
-                self.expect(TokenType.SEMICOLON)
-                return Break()
-            case TokenType.CONTINUE:
-                self.advance()
-                self.expect(TokenType.SEMICOLON)
-                return Continue()
-            case TokenType.WHILE:
-                return self.parse_while()
-            case TokenType.DO:
-                return self.parse_dowhile()
-            case TokenType.FOR:
-                return self.parse_for()
-            case _:
-                exp = self.parse_exp()
-                self.expect(TokenType.SEMICOLON)
-                return Expression(exp)
+            case TokenType.RETURN: return self.parse_return()
+            case TokenType.SEMICOLON: return self.parse_null()
+            case TokenType.IF: return self.parse_if()
+            case TokenType.OPEN_BRACE: return Compound(self.parse_block())
+            case TokenType.BREAK: return self.parse_break()
+            case TokenType.CONTINUE: return self.parse_continue()
+            case TokenType.WHILE: return self.parse_while()
+            case TokenType.DO: return self.parse_dowhile()
+            case TokenType.FOR: return self.parse_for()
+            case _: return self.parse_expression_statement()
             
+    def parse_return(self) -> Return:
+        self.expect(TokenType.RETURN)
+        exp = self.parse_exp()
+        self.expect(TokenType.SEMICOLON)
+        return Return(exp)
+    
+    def parse_null(self) -> Null:
+        self.expect(TokenType.SEMICOLON)
+        return Null()
+    
+    def parse_break(self) -> Break:
+        self.expect(TokenType.BREAK)
+        self.expect(TokenType.SEMICOLON)
+        return Break()
+    
+    def parse_continue(self) -> Continue:
+        self.expect(TokenType.CONTINUE)
+        self.expect(TokenType.SEMICOLON)
+        return Continue()
+            
+    def parse_expression_statement(self) -> Expression:
+        exp = self.parse_exp()
+        self.expect(TokenType.SEMICOLON)
+        return Expression(exp)
+
     def parse_if(self):
         self.expect(TokenType.IF)
         self.expect(TokenType.OPEN_PAREN)
@@ -351,11 +357,13 @@ class Parser:
     def next_token_is(self, kind) -> bool:
         return self.peek().token_type == kind
     
-    def peek(self) -> Token:
-        return self.tokens[0]
+    def peek(self, n = 0) -> Token:
+        if len(self.tokens) > n:
+            return self.tokens[n]
+        raise RuntimeError("No more tokens")
     
     def advance(self) -> Token:
-        return self.tokens.pop(0)
+        return self.tokens.popleft()
         
     def expect(self, expected) -> Token:
         if not isinstance(expected, Iterable):
