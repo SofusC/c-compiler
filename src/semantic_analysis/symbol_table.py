@@ -45,3 +45,9 @@ class IntInit(StaticInit):
 @dataclass
 class LongInit(StaticInit):
     int: int
+@dataclass
+class UIntInit(StaticInit):
+    int: int
+@dataclass
+class ULongInit(StaticInit):
+    int: int

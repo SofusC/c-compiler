@@ -36,7 +36,7 @@ def typecheck_function_declaration(decl: FunctionDeclaration):
 def typecheck_file_scope_variable_declaration(var_decl: VariableDeclaration):
     name, init, type_, storage_class = var_decl.name, var_decl.init, var_decl.var_type, var_decl.storage_class
     if isinstance(init, Constant):
-        initial_value = resolve_const_init(init)
+        initial_value = resolve_static_const_init(init, type_)
     elif var_decl.init is None:
         if storage_class == StorageClass.extern:
             initial_value = NoInitializer()
@@ -87,7 +87,7 @@ def typecheck_local_variable_declaration(var_decl: VariableDeclaration):
         if init is None:
             initial_value = Initial(IntInit(0))
         elif isinstance(init, Constant):
-            initial_value = resolve_const_init(init)
+            initial_value = resolve_static_const_init(init, type_)
         else:
             raise RuntimeError(f"Non-constant initializer on local static variable {var_decl}")
         symbol_table[name] = SymbolEntry(
@@ -118,10 +118,16 @@ def typecheck_variable(var: Var):
 @log
 def typecheck_constant(constant: Constant):
     match constant.constant:
-        case ConstInt(i):
+        case ConstInt():
             set_type(constant, Int)
-        case ConstLong(l):
+        case ConstLong():
             set_type(constant, Long)
+        case ConstUInt():
+            set_type(constant, UInt)
+        case ConstULong():
+            set_type(constant, ULong)
+        case _:
+            raise RuntimeError(f"Compiler error, cant typecheck {constant}")
 
 @log
 def typecheck_cast(cast: Cast):
@@ -204,8 +210,18 @@ def get_type(exp: Exp):
 def get_common_type(type1: Type, type2: Type):
     if type1 == type2:
         return type1
-    else:
-        return Long
+    if size(type1) == size(type2):
+        if type1.is_signed:
+            return type2
+        return type1
+    if size(type1) > size(type2):
+        return type1
+    return type2
+
+def size(type: IntegralType):
+    if isinstance(type, FunType):
+        raise RuntimeError(f"Compiler error, cannot get size of function type {type}")
+    return type.BIT_WIDTH
     
 @log
 def convert_to(exp: Exp, type: Type):
@@ -217,21 +233,24 @@ def convert_to(exp: Exp, type: Type):
 
 @log 
 def static_type_conversion(value: int, to_type):
-    if to_type is not Int:
-        raise RuntimeError(f"Compiler error: cannot statically convert to type {to_type}")
-
-    return ((value + Int.RANGE//2) % Int.RANGE) - Int.RANGE//2
+    if to_type is Int:
+        return ((value + Int.RANGE//2) % Int.RANGE) - Int.RANGE//2
+    if to_type is UInt:
+        return value % UInt.RANGE
+    raise RuntimeError(f"Compiler error: cannot statically convert to type {to_type}")
 
 @log
-def resolve_const_init(constant: Constant):
-    match constant.constant:
-        case ConstInt(i):
-            initial_value = Initial(IntInit(static_type_conversion(i, Int)))
-        case ConstLong(l):
-            initial_value = Initial(LongInit(l))
-        case _:
-            raise RuntimeError(f"Compiler error, cant typecheck {constant}")
-    return initial_value
+def resolve_static_const_init(constant: Constant, decl_type: IntegralType):
+    value = constant.constant.int
+    if decl_type is Int:
+        return Initial(IntInit(static_type_conversion(value, Int)))
+    if decl_type is Long:
+        return Initial(LongInit(value))
+    if decl_type is UInt:
+        return Initial(UIntInit(static_type_conversion(value, UInt)))
+    if decl_type is ULong:
+        return Initial(ULongInit(value))
+    raise RuntimeError(f"Cannot resolve constant initializer {constant} for type {decl_type}")
 
 
 @log("Typechecking:")

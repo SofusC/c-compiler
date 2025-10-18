@@ -49,14 +49,24 @@ class FunctionDeclaration(ASTNode):
 class Type(ASTNode): 
     pass
 
-class SignedType(Type):
+class IntegralType(Type):
     BIT_WIDTH: int
 
+    def is_signed(self) -> bool:
+        raise NotImplementedError()
+    
+    def __repr__(cls):
+        return cls.__name__
+    
+class SignedType(IntegralType):
     def __init_subclass__(cls):
         super().__init_subclass__()
         cls.MIN_VALUE = -2**(cls.BIT_WIDTH - 1)
         cls.MAX_VALUE = 2**(cls.BIT_WIDTH - 1) - 1
         cls.RANGE = 2**cls.BIT_WIDTH
+
+    def is_signed(self) -> bool:
+        return True
 
 class Int(SignedType):
     BIT_WIDTH = 32
@@ -64,14 +74,15 @@ class Int(SignedType):
 class Long(SignedType): 
     BIT_WIDTH = 64
 
-class UnsignedType(Type):
-    BIT_WIDTH: int
-
+class UnsignedType(IntegralType):
     def __init_subclass__(cls):
         super().__init_subclass__()
         cls.MIN_VALUE = 0
         cls.MAX_VALUE = 2**(cls.BIT_WIDTH) - 1
         cls.RANGE = 2**cls.BIT_WIDTH
+
+    def is_signed(self) -> bool:
+        return False
 
 class UInt(UnsignedType):
     BIT_WIDTH = 32
