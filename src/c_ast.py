@@ -47,13 +47,20 @@ class FunctionDeclaration(ASTNode):
 
 
 class Type(ASTNode): 
-    pass
+    @classmethod
+    def size(cls) -> int:
+        raise NotImplementedError()
+
+    @classmethod
+    def is_signed(cls) -> bool:
+        raise NotImplementedError()
 
 class IntegralType(Type):
     BIT_WIDTH: int
 
-    def is_signed(self) -> bool:
-        raise NotImplementedError()
+    @classmethod
+    def size(cls) -> int:
+        return cls.BIT_WIDTH
     
     def __repr__(cls):
         return cls.__name__
@@ -65,7 +72,8 @@ class SignedType(IntegralType):
         cls.MAX_VALUE = 2**(cls.BIT_WIDTH - 1) - 1
         cls.RANGE = 2**cls.BIT_WIDTH
 
-    def is_signed(self) -> bool:
+    @classmethod
+    def is_signed(cls) -> bool:
         return True
 
 class Int(SignedType):
@@ -81,7 +89,8 @@ class UnsignedType(IntegralType):
         cls.MAX_VALUE = 2**(cls.BIT_WIDTH) - 1
         cls.RANGE = 2**cls.BIT_WIDTH
 
-    def is_signed(self) -> bool:
+    @classmethod
+    def is_signed(cls) -> bool:
         return False
 
 class UInt(UnsignedType):

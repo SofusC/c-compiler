@@ -50,6 +50,11 @@ class IRSignExtend(IRInstruction):
 class IRTruncate(IRInstruction):
     src: IRVal
     dst: IRVal
+
+@dataclass
+class IRZeroExtend(IRInstruction):
+    src: IRVal
+    dst: IRVal
     
 @dataclass
 class IRUnary(IRInstruction):

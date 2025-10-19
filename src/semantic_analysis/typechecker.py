@@ -207,21 +207,16 @@ def get_type(exp: Exp):
     return exp.type
 
 @log
-def get_common_type(type1: Type, type2: Type):
+def get_common_type(type1: IntegralType, type2: IntegralType) -> IntegralType:
     if type1 == type2:
         return type1
-    if size(type1) == size(type2):
-        if type1.is_signed:
+    if type1.size() == type2.size():
+        if type1.is_signed():
             return type2
         return type1
-    if size(type1) > size(type2):
+    if type1.size() > type2.size():
         return type1
     return type2
-
-def size(type: IntegralType):
-    if isinstance(type, FunType):
-        raise RuntimeError(f"Compiler error, cannot get size of function type {type}")
-    return type.BIT_WIDTH
     
 @log
 def convert_to(exp: Exp, type: Type):

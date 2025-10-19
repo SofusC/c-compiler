@@ -103,15 +103,18 @@ def emit_function_call(instructions: List[IRInstruction], result_type: Type, ide
 @log
 def emit_cast(instructions: List[IRInstruction], target_type: Type, inner_exp: Exp) -> IRVar:
     result = emit_exp(instructions, inner_exp)
-    if target_type == get_type(inner_exp):
+    inner_type = get_type(inner_exp)
+    if target_type == inner_type:
         return result
     dst = make_tacky_variable(target_type)
-    if target_type is Long:
-        instructions.append(IRSignExtend(result, dst))
-    elif target_type is Int:
+    if target_type.size() == inner_type.size():
+        instructions.append(IRCopy(result, dst))
+    elif target_type.size() < inner_type.size():
         instructions.append(IRTruncate(result, dst))
+    elif inner_type.is_signed():
+        instructions.append(IRSignExtend(result, dst))
     else:
-        raise RuntimeError(f"Compiler error, cant emit for cast to type {target_type}")
+        instructions.append(IRZeroExtend(result, dst))
     return dst
         
 @log
@@ -349,6 +352,10 @@ def convert_symbols_to_tacky():
                     value = IntInit(0) 
                 elif type_ is Long: 
                     value = LongInit(0)
+                elif type_ is UInt:
+                    value = UIntInit(0)
+                elif type_ is ULong: 
+                    value = ULongInit(0)
                 else:
                     raise RuntimeError(f"Compiler error, cant convert to tacky symbol for {type_}")
             case NoInitializer():
